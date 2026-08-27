@@ -1,0 +1,34 @@
+name: SP IG - Manual Backfill
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Backfill target'
+        required: true
+        type: choice
+        options:
+          - post-insights
+          - comments
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sp-instagram
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Run backfill
+        run: |
+          if [ "${{ inputs.target }}" = "post-insights" ]; then
+            npm run backfill-post-insights
+          else
+            npm run backfill-comments
+          fi
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SP_IG_ACCESS_TOKEN: ${{ secrets.SP_IG_ACCESS_TOKEN }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
