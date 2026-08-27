@@ -1,4 +1,5 @@
 const { TIKTOK_INSIGHT_CONFIG } = require("./config");
+const { toSheetDateString } = require("./dateUtils");
 const { getValidTikTokToken } = require("./tiktokAuth");
 
 async function ensureSheetWithHeader(sheets, spreadsheetId, sheetName, headers) {
@@ -20,7 +21,7 @@ async function ensureSheetWithHeader(sheets, spreadsheetId, sheetName, headers) 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1`,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       requestBody: { values: [headers] },
     });
   }
@@ -128,14 +129,14 @@ async function pullTikTokInsights({ sheets }) {
     const title = v.title || (v.video_description ? v.video_description.substring(0, 80) : "Video " + v.id);
     const rowData = [
       title,
-      v.create_time ? new Date(v.create_time * 1000).toISOString() : "",
+      v.create_time ? toSheetDateString(new Date(v.create_time * 1000)) : "",
       v.id,
       v.share_url || "",
       v.view_count || 0,
       v.like_count || 0,
       v.comment_count || 0,
       v.share_count || 0,
-      new Date().toISOString(),
+      toSheetDateString(new Date()),
     ];
 
     if (idToRowIndex.hasOwnProperty(v.id)) {
@@ -153,7 +154,7 @@ async function pullTikTokInsights({ sheets }) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A2`,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       requestBody: { values: finalData },
     });
   }

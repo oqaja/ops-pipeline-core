@@ -1,4 +1,5 @@
 const { TIKTOK_INSIGHT_CONFIG } = require("./config");
+const { toSheetDateString } = require("./dateUtils");
 const { getValidTikTokToken } = require("./tiktokAuth");
 
 async function pullTikTokAccountSnapshot({ sheets }) {
@@ -37,13 +38,13 @@ async function pullTikTokAccountSnapshot({ sheets }) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1`,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       requestBody: { values: [headers] },
     });
   }
 
   const newRow = [
-    new Date().toISOString(),
+    toSheetDateString(new Date()),
     user.display_name || "",
     user.follower_count || 0,
     user.following_count || 0,
@@ -54,7 +55,7 @@ async function pullTikTokAccountSnapshot({ sheets }) {
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: sheetName,
-    valueInputOption: "RAW",
+    valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [newRow] },
   });
