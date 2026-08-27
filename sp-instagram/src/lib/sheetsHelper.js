@@ -1,3 +1,13 @@
+const { toSheetDateString } = require("./dateUtils");
+
+function formatValueForSheets(value) {
+  return value instanceof Date ? toSheetDateString(value) : value;
+}
+
+function formatRowForSheets(rowValues) {
+  return rowValues.map(formatValueForSheets);
+}
+
 /**
  * sheetsHelper.js
  * Helper generik pengganti method Apps Script (getDataRange().getValues(),
