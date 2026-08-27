@@ -144,3 +144,22 @@ module.exports = {
   parseFlexibleDate,
   getDatePartsInTimezone,
 };
+
+/** Format Date jadi "YYYY-MM-DD HH:mm:ss" di timezone Asia/Jakarta (WIB), biar Sheets kenali sebagai tanggal beneran (bukan teks ISO). */
+function toSheetDateString(date, timezone = "Asia/Jakarta") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+module.exports.toSheetDateString = toSheetDateString;

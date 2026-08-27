@@ -87,7 +87,7 @@ async function setCellValue(sheets, spreadsheetId, sheetName, rowNumber, colNumb
     spreadsheetId,
     range: `'${sheetName}'!${colLetter}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[value]] },
+    requestBody: { values: [[formatValueForSheets(value)]] },
   });
 }
 
@@ -98,7 +98,7 @@ async function setRowValues(sheets, spreadsheetId, sheetName, rowNumber, rowValu
     spreadsheetId,
     range: `'${sheetName}'!A${rowNumber}:${lastColLetter}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [rowValues] },
+    requestBody: { values: [formatRowForSheets(rowValues)] },
   });
 }
 
@@ -109,7 +109,7 @@ async function appendRow(sheets, spreadsheetId, sheetName, rowValues) {
     range: `'${sheetName}'!A1`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [rowValues] },
+    requestBody: { values: [formatRowForSheets(rowValues)] },
   });
 }
 
