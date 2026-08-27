@@ -1,0 +1,26 @@
+name: SP TikTok - Account Snapshot
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sp-tiktok
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run account-snapshot
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
+          SECRETS_WRITE_PAT: ${{ secrets.SECRETS_WRITE_PAT }}

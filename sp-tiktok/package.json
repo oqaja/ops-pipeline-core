@@ -4,12 +4,17 @@
   "private": true,
   "description": "TikTok (Shoe Police) content automation via Buffer — migrated from Google Apps Script to Node.js / GitHub Actions.",
   "type": "commonjs",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "main-upload": "node scripts/run-main-upload.js",
-    "status-check": "node scripts/run-status-check.js"
+    "status-check": "node scripts/run-status-check.js",
+    "post-insights": "node scripts/run-post-insights.js",
+    "account-snapshot": "node scripts/run-account-snapshot.js"
   },
   "dependencies": {
-    "googleapis": "^140.0.1"
+    "googleapis": "^140.0.1",
+    "libsodium-wrappers": "^0.8.4"
   }
 }

@@ -29,3 +29,11 @@ module.exports = {
   getBufferApiKey: () => getSecret("BUFFER_API_KEY"),
   getDriveApiKey: () => process.env.GOOGLE_DRIVE_API_KEY || null,
 };
+
+const TIKTOK_INSIGHT_CONFIG = {
+  INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
+  VIDEO_SHEET_NAME: "TikTok",
+  ACCOUNT_SHEET_NAME: "TikTok Account",
+};
+
+module.exports.TIKTOK_INSIGHT_CONFIG = TIKTOK_INSIGHT_CONFIG;
