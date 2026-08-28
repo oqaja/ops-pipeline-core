@@ -69,7 +69,7 @@ async function readSheetAsObjects(sheets, spreadsheetId, sheetName) {
 const headerMapCache = new Map();
 
 async function getHeaderColumnMap(sheets, spreadsheetId, sheetName) {
-  const _cacheKey = `::`;
+  const _cacheKey = `${spreadsheetId}::${sheetName}`;
   if (headerMapCache.has(_cacheKey)) return headerMapCache.get(_cacheKey);
 
   const res = await sheets.spreadsheets.values.get({
