@@ -1,0 +1,25 @@
+name: SP IG - Backfill Post Insights (Auto Batch)
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sp-instagram
+    concurrency:
+      group: sp-ig-backfill-post-insights
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run backfill-post-insights
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SP_IG_ACCESS_TOKEN: ${{ secrets.SP_IG_ACCESS_TOKEN }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}

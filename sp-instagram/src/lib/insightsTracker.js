@@ -13,6 +13,10 @@ const POST_INSIGHT_HEADERS = [
 
 const ACCOUNT_INSIGHT_HEADERS = ["TANGGAL", "REACH", "VIEWS", "ACCOUNTS ENGAGED", "TOTAL INTERACTIONS", "FOLLOWERS"];
 
+const BACKFILL_MAX_PAGES_PER_RUN = 2; // 2 halaman x 25 post = 50 post per run, biar aman dari rate limit
+const BACKFILL_CURSOR_KEY = "SP_BACKFILL_CURSOR";
+const BACKFILL_DONE_KEY = "SP_BACKFILL_DONE";
+
 async function fetchSingleMetric(objectId, metric, extraParams, accessToken) {
   try {
     const params = { metric, ...(extraParams || {}) };
@@ -154,13 +158,28 @@ async function runPostInsights(sheets) {
   console.log(`Selesai update insight per-post (${allMedia.length} post).`);
 }
 
+/**
+ * Backfill SEMUA post, TAPI dibatasi maksimal BACKFILL_MAX_PAGES_PER_RUN
+ * halaman per kali dipanggil (~50 post) - jauh di bawah rate limit Sheets
+ * API, jadi gak perlu ngelawan kuota sama sekali. Cursor + status "selesai"
+ * disimpan di stateStore, jadi run berikutnya (dipanggil ulang via jadwal
+ * cron) otomatis lanjut dari titik terakhir, sampai beneran habis semua -
+ * bisa makan waktu berhari-hari kalau post-nya banyak, itu memang desainnya
+ * (prioritas: gak pernah nabrak limit, bukan kecepatan).
+ */
 async function backfillAllPosts(sheets) {
+  const alreadyDone = await getState(sheets, BACKFILL_DONE_KEY);
+  if (alreadyDone === "true") {
+    console.log("Backfill sudah pernah selesai total sebelumnya - tidak ada yang perlu dikerjakan lagi.");
+    console.log("(Kalau mau backfill ulang dari awal, hapus baris 'SP_BACKFILL_DONE' di tab _State secara manual.)");
+    return;
+  }
+
   const accountId = CONFIG.IG_BUSINESS_ACCOUNT_ID;
   const accessToken = getIgAccessToken();
-  const cursorKey = "SP_BACKFILL_CURSOR";
 
-  let nextUrl = await getState(sheets, cursorKey);
-  console.log("=== BACKFILL SEMUA POST (SP) ===");
+  let nextUrl = await getState(sheets, BACKFILL_CURSOR_KEY);
+  console.log("=== BACKFILL SEMUA POST (SP) - batch ini ===");
   console.log(nextUrl ? "Melanjutkan dari progress run sebelumnya..." : "Mulai dari awal (post TERBARU dulu, mundur ke yang PALING LAMA).");
 
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, POST_INSIGHT_HEADERS);
@@ -169,8 +188,9 @@ async function backfillAllPosts(sheets) {
   let totalProcessed = 0;
   let pageCount = 0;
   let isFirstFetch = !nextUrl;
+  let habisTotal = false;
 
-  while (true) {
+  while (pageCount < BACKFILL_MAX_PAGES_PER_RUN) {
     let json;
     if (isFirstFetch) {
       json = await callGraphApi(
@@ -188,7 +208,7 @@ async function backfillAllPosts(sheets) {
     pageCount++;
 
     const mediaList = json.data || [];
-    console.log(`Halaman ${pageCount}: ${mediaList.length} post.`);
+    console.log(`Halaman ${pageCount}/${BACKFILL_MAX_PAGES_PER_RUN} (batch ini): ${mediaList.length} post.`);
 
     for (const media of mediaList) {
       await new Promise((r) => setTimeout(r, 2500));
@@ -198,15 +218,22 @@ async function backfillAllPosts(sheets) {
 
     if (json.paging && json.paging.next) {
       nextUrl = json.paging.next;
-      await setState(sheets, cursorKey, nextUrl);
+      await setState(sheets, BACKFILL_CURSOR_KEY, nextUrl);
     } else {
-      await deleteState(sheets, cursorKey);
+      habisTotal = true;
       break;
     }
   }
 
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "TANGGAL UPLOAD");
-  console.log(`=== BACKFILL SELESAI TOTAL - ${totalProcessed} post diproses. ===`);
+
+  if (habisTotal) {
+    await deleteState(sheets, BACKFILL_CURSOR_KEY);
+    await setState(sheets, BACKFILL_DONE_KEY, "true");
+    console.log(`=== BACKFILL SELESAI TOTAL - ${totalProcessed} post diproses di batch terakhir ini. ===`);
+  } else {
+    console.log(`=== Batch ini selesai (${totalProcessed} post). Belum tuntas semua - lanjut otomatis di run berikutnya. ===`);
+  }
 }
 
 async function fetchFollowersCount(accountId, accessToken) {
