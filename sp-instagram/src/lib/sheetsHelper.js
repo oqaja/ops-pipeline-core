@@ -250,3 +250,33 @@ module.exports = {
   applyDateFormat,
   columnNumberToLetter,
 };
+
+/** Terapkan format tanggal ke BEBERAPA cell sekaligus dalam 1 API call (bukan 1 call per cell). */
+async function applyDateFormats(sheets, spreadsheetId, sheetName, rowNumber, formatSpecs) {
+  const meta = await getSheetMeta(sheets, spreadsheetId, sheetName);
+  if (!meta.exists) return;
+
+  const requests = formatSpecs
+    .filter((spec) => spec.colNumber)
+    .map((spec) => ({
+      repeatCell: {
+        range: {
+          sheetId: meta.sheetId,
+          startRowIndex: rowNumber - 1,
+          endRowIndex: rowNumber,
+          startColumnIndex: spec.colNumber - 1,
+          endColumnIndex: spec.colNumber,
+        },
+        cell: { userEnteredFormat: { numberFormat: { type: "DATE_TIME", pattern: spec.pattern } } },
+        fields: "userEnteredFormat.numberFormat",
+      },
+    }));
+
+  if (requests.length === 0) return;
+
+  await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+}
+
+module.exports.applyDateFormats = applyDateFormats;
+
+/** Terapkan format tanggal ke BEBERAPA cell sekaligus dalam 1 API call (bukan 1 call per cell). */

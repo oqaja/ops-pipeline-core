@@ -1,21 +1,7 @@
-/**
- * insightsTracker.js
- * Port dari SP_InsightsTracker.gs (Modul 7) - tarik insight per-post & level
- * akun, simpan ke spreadsheet Insights terpisah.
- *
- * PropertiesService (buat cursor backfill) diganti stateStore.js (tab
- * "_State" di spreadsheet Insights). Batas waktu 4.5 menit/6 menit Apps
- * Script TIDAK relevan lagi di GitHub Actions (job bisa jalan sampai
- * beberapa jam) - jadi backfill di sini jalan sampai BENERAN SELESAI
- * dalam 1x run, tanpa perlu re-trigger berkali-kali seperti versi Apps
- * Script. Auto-resume tetap dipertahankan (kalau run terputus karena
- * error/timeout job, run berikutnya lanjut dari cursor terakhir).
- */
-
 const { CONFIG } = require("./config");
 const { callGraphApi } = require("./instagramPublisher");
 const { getIgAccessToken } = require("./config");
-const { readSheetAsObjects, ensureSheetWithHeaders, upsertRowByKey, sortByColumnDesc, applyDateFormat, getHeaderColumnMap } = require("./sheetsHelper");
+const { readSheetAsObjects, ensureSheetWithHeaders, upsertRowByKey, sortByColumnDesc, applyDateFormats, getHeaderColumnMap } = require("./sheetsHelper");
 const { getState, setState, deleteState } = require("./stateStore");
 const { parseFlexibleDate } = require("./dateUtils");
 
@@ -27,7 +13,6 @@ const POST_INSIGHT_HEADERS = [
 
 const ACCOUNT_INSIGHT_HEADERS = ["TANGGAL", "REACH", "VIEWS", "ACCOUNTS ENGAGED", "TOTAL INTERACTIONS", "FOLLOWERS"];
 
-/** Setara spFetchSingleMetric_. */
 async function fetchSingleMetric(objectId, metric, extraParams, accessToken) {
   try {
     const params = { metric, ...(extraParams || {}) };
@@ -48,7 +33,6 @@ async function fetchSingleMetric(objectId, metric, extraParams, accessToken) {
   }
 }
 
-/** Setara spFetchAllMedia_ tapi tanpa batas MAX_INSIGHTS_PAGES kalau dipanggil backfill (lihat parameter). @private */
 async function fetchMediaPage(accountId, pageUrl, accessToken) {
   let json;
   if (pageUrl) {
@@ -82,7 +66,6 @@ async function fetchAllMediaCapped(accountId, accessToken, maxPages) {
   return allMedia;
 }
 
-/** Setara spGetSheetContextMap_. */
 async function getSheetContextMap(sheets) {
   const headerMap = await getHeaderColumnMap(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME);
   const postIdCol = headerMap[CONFIG.POST_ID_COLUMN];
@@ -110,7 +93,6 @@ function summarizeCaption(caption) {
   return firstLine.length > 60 ? firstLine.substring(0, 60) + "..." : firstLine;
 }
 
-/** Setara spProcessSingleMediaInsight_. */
 async function processSingleMediaInsight(media, contextMap, accessToken, sheets) {
   const postId = media.id;
   const context = contextMap[postId];
@@ -146,11 +128,12 @@ async function processSingleMediaInsight(media, contextMap, accessToken, sheets)
   const writtenRow = await upsertRowByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", postId, rowData);
 
   const insightsHeaderMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME);
-  await applyDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, writtenRow, insightsHeaderMap["TANGGAL UPLOAD"], "dd/mm/yyyy hh:mm");
-  await applyDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, writtenRow, insightsHeaderMap["TERAKHIR DIUPDATE"], "dd/mm/yyyy hh:mm");
+  await applyDateFormats(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, writtenRow, [
+    { colNumber: insightsHeaderMap["TANGGAL UPLOAD"], pattern: "dd/mm/yyyy hh:mm" },
+    { colNumber: insightsHeaderMap["TERAKHIR DIUPDATE"], pattern: "dd/mm/yyyy hh:mm" },
+  ]);
 }
 
-/** Setara spRunPostInsights() - update insight semua post terbaru (dibatasi MAX_INSIGHTS_PAGES). */
 async function runPostInsights(sheets) {
   const accountId = CONFIG.IG_BUSINESS_ACCOUNT_ID;
   const accessToken = getIgAccessToken();
@@ -163,7 +146,7 @@ async function runPostInsights(sheets) {
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, POST_INSIGHT_HEADERS);
 
   for (const media of allMedia) {
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 2500));
     await processSingleMediaInsight(media, contextMap, accessToken, sheets);
   }
 
@@ -171,13 +154,6 @@ async function runPostInsights(sheets) {
   console.log(`Selesai update insight per-post (${allMedia.length} post).`);
 }
 
-/**
- * Setara spBackfillAllPostsManual() - TAPI jalan sampai BENERAN SELESAI
- * dalam 1x run (tidak perlu re-trigger tiap 10 menit seperti Apps Script,
- * karena GitHub Actions job punya jatah waktu jauh lebih panjang). Cursor
- * tetap disimpan di stateStore, jadi kalau run ini crash di tengah jalan,
- * run berikutnya otomatis lanjut dari titik terakhir (bukan dari 0 lagi).
- */
 async function backfillAllPosts(sheets) {
   const accountId = CONFIG.IG_BUSINESS_ACCOUNT_ID;
   const accessToken = getIgAccessToken();
@@ -215,7 +191,7 @@ async function backfillAllPosts(sheets) {
     console.log(`Halaman ${pageCount}: ${mediaList.length} post.`);
 
     for (const media of mediaList) {
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 2500));
       await processSingleMediaInsight(media, contextMap, accessToken, sheets);
       totalProcessed++;
     }
@@ -233,7 +209,6 @@ async function backfillAllPosts(sheets) {
   console.log(`=== BACKFILL SELESAI TOTAL - ${totalProcessed} post diproses. ===`);
 }
 
-/** Setara spFetchFollowersCount_. */
 async function fetchFollowersCount(accountId, accessToken) {
   try {
     const result = await callGraphApi(accountId, "get", { fields: "followers_count" }, accessToken);
@@ -244,7 +219,6 @@ async function fetchFollowersCount(accountId, accessToken) {
   }
 }
 
-/** Setara spRunAccountInsights(). */
 async function runAccountInsights(sheets) {
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, ACCOUNT_INSIGHT_HEADERS);
 
@@ -268,19 +242,15 @@ async function runAccountInsights(sheets) {
   const { rows } = await readRows(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
   const lastRow = rows.length + 1;
   const accountHeaderMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
-  await applyDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, lastRow, accountHeaderMap["TANGGAL"], "dd/mm/yyyy");
+  await applyDateFormats(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, lastRow, [
+    { colNumber: accountHeaderMap["TANGGAL"], pattern: "dd/mm/yyyy" },
+  ]);
 
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "TANGGAL");
 
   console.log(`Insight akun hari ini ditambahkan. Followers: ${followersCount !== null ? followersCount : "(gagal diambil)"}`);
 }
 
-/**
- * Setara spBackfillAccountInsightsManual(daysBack) - tarik histori metric
- * 'reach' N hari ke belakang (satu-satunya metric yang Instagram API
- * izinkan ditarik mundur; metric lain cuma tercatat mulai sekarang lewat
- * runAccountInsights harian).
- */
 async function backfillAccountInsights(sheets, daysBack = 30) {
   const accountId = CONFIG.IG_BUSINESS_ACCOUNT_ID;
   const accessToken = getIgAccessToken();
@@ -334,8 +304,8 @@ async function backfillAccountInsights(sheets, daysBack = 30) {
     const rowData = [
       dateObj,
       values.reach !== undefined ? values.reach : null,
-      null, null, null, // views/accounts_engaged/total_interactions tidak tersedia untuk histori
-      null, // followers: Instagram API tidak sediakan data historis followers
+      null, null, null,
+      null,
     ];
 
     const { rows: existingRows } = await readSheetAsObjects(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
