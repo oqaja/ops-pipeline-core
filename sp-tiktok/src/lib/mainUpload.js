@@ -54,8 +54,9 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
 
     const nomorBaris = i + 1;
 
-    const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
+        const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
     if (!jadwalUpload) {
+      console.log(`  DEBUG baris ${nomorBaris}: tanggalCell=${JSON.stringify(tanggalCell)}, jamUpTT=${JSON.stringify(jamUpTT)}`);
       console.log(
         `Baris ${nomorBaris} dilewati: TANGGAL/JAM UP TT tidak valid.`
       );
