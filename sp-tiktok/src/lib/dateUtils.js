@@ -31,7 +31,14 @@ function gabungkanTanggalJam(tanggalCell, jamCell) {
   const menit = parseInt(parts[1], 10);
   if (isNaN(jam) || isNaN(menit) || jam < 0 || jam > 23 || menit < 0 || menit > 59) return null;
 
-  return new Date(tanggalDate.getFullYear(), tanggalDate.getMonth(), tanggalDate.getDate(), jam, menit, 0);
+  return new Date(Date.UTC(
+    tanggalDate.getFullYear(),
+    tanggalDate.getMonth(),
+    tanggalDate.getDate(),
+    jam - 7,
+    menit,
+    0
+  ));
 }
 
 module.exports = { gabungkanTanggalJam };
