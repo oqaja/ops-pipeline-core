@@ -1,8 +1,27 @@
+const BULAN_ID = {
+  jan: 0, feb: 1, mar: 2, apr: 3, mei: 4, jun: 5,
+  jul: 6, agu: 7, sep: 8, okt: 9, nov: 10, des: 11,
+};
+
+function parseTanggalIndonesia(value) {
+  const match = String(value).trim().match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{4})$/);
+  if (!match) return null;
+  const day = parseInt(match[1], 10);
+  const monthKey = match[2].toLowerCase().substring(0, 3);
+  const month = BULAN_ID[monthKey];
+  const year = parseInt(match[3], 10);
+  if (month === undefined || isNaN(day) || isNaN(year)) return null;
+  return new Date(year, month, day);
+}
+
 function gabungkanTanggalJam(tanggalCell, jamCell) {
   if (!tanggalCell || !jamCell) return null;
 
-  const tanggalDate = new Date(tanggalCell);
-  if (isNaN(tanggalDate.getTime())) return null;
+  let tanggalDate = new Date(tanggalCell);
+  if (isNaN(tanggalDate.getTime())) {
+    tanggalDate = parseTanggalIndonesia(tanggalCell);
+  }
+  if (!tanggalDate || isNaN(tanggalDate.getTime())) return null;
 
   const jamStr = jamCell.toString().trim();
   const parts = jamStr.split(".");
