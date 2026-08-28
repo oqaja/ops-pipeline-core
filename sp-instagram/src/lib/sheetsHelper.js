@@ -66,7 +66,12 @@ async function readSheetAsObjects(sheets, spreadsheetId, sheetName) {
 }
 
 /** Balikin map { namaHeader: nomorKolom (1-indexed) }. */
+const headerMapCache = new Map();
+
 async function getHeaderColumnMap(sheets, spreadsheetId, sheetName) {
+  const _cacheKey = `::`;
+  if (headerMapCache.has(_cacheKey)) return headerMapCache.get(_cacheKey);
+
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `'${sheetName}'!1:1`,
@@ -77,6 +82,7 @@ async function getHeaderColumnMap(sheets, spreadsheetId, sheetName) {
     const trimmed = String(name || "").trim();
     if (trimmed) map[trimmed] = idx + 1;
   });
+  headerMapCache.set(_cacheKey, map);
   return map;
 }
 
@@ -136,6 +142,7 @@ async function ensureSheetWithHeaders(sheets, spreadsheetId, sheetName, headers)
       requestBody: { requests: [{ addSheet: { properties: { title: sheetName } } }] },
     });
     invalidateSheetMetaCache(spreadsheetId, sheetName);
+    headerMapCache.delete(`${spreadsheetId}::${sheetName}`);
     await setRowValues(sheets, spreadsheetId, sheetName, 1, headers);
     return true;
   }

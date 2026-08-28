@@ -163,6 +163,7 @@ async function runPostInsights(sheets) {
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, POST_INSIGHT_HEADERS);
 
   for (const media of allMedia) {
+    await new Promise((r) => setTimeout(r, 300));
     await processSingleMediaInsight(media, contextMap, accessToken, sheets);
   }
 
@@ -214,6 +215,7 @@ async function backfillAllPosts(sheets) {
     console.log(`Halaman ${pageCount}: ${mediaList.length} post.`);
 
     for (const media of mediaList) {
+      await new Promise((r) => setTimeout(r, 300));
       await processSingleMediaInsight(media, contextMap, accessToken, sheets);
       totalProcessed++;
     }
