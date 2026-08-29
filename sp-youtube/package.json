@@ -1,0 +1,18 @@
+{
+  "name": "sp-youtube-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YouTube (Shoe Police, main channel) upload + insights + comments — GitHub Actions, Service Account for Sheets/Docs/Drive + OAuth for YouTube.",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "main-upload": "node scripts/run-main-upload.js",
+    "post-insights": "node scripts/run-post-insights.js",
+    "account-snapshot": "node scripts/run-account-snapshot.js",
+    "comments": "node scripts/run-comments.js"
+  },
+  "dependencies": {
+    "googleapis": "^140.0.1",
+    "libsodium-wrappers": "^0.8.4"
+  }
+}
