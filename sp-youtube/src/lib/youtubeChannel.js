@@ -13,7 +13,6 @@ async function getChannelInfo(youtube) {
   return { uploadsPlaylistId: cachedUploadsPlaylistId, channelId: cachedChannelId };
 }
 
-/** Ambil 1 halaman video dari uploads playlist (terbaru dulu). pageToken null = mulai dari awal (terbaru). */
 async function listUploadsPage(youtube, uploadsPlaylistId, pageToken, maxResults = 50) {
   const res = await youtube.playlistItems.list({
     part: ["snippet", "contentDetails"],
@@ -41,4 +40,29 @@ async function getChannelStatistics(youtube) {
   };
 }
 
-module.exports = { getChannelInfo, listUploadsPage, getChannelStatistics };
+function parseISO8601Duration(iso) {
+  const match = (iso || "").match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
+  const seconds = parseInt(match[3] || "0", 10);
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/** Ambil durasi untuk sampai 50 video ID sekaligus. */
+async function getVideoDetails(youtube, videoIds) {
+  if (videoIds.length === 0) return {};
+
+  const res = await youtube.videos.list({
+    part: ["contentDetails"],
+    id: videoIds,
+  });
+
+  const map = {};
+  for (const item of res.data.items || []) {
+    map[item.id] = { durationSeconds: parseISO8601Duration(item.contentDetails.duration) };
+  }
+  return map;
+}
+
+module.exports = { getChannelInfo, listUploadsPage, getChannelStatistics, getVideoDetails, parseISO8601Duration };
