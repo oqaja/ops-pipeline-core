@@ -5,6 +5,9 @@ function isReadyToPost(row) {
   const akun = String(row[CONFIG.AKUN_COLUMN] || "").trim().toUpperCase();
   if (akun !== "SP") return false;
 
+  const jenisKonten = String(row[CONFIG.JENIS_KONTEN_COLUMN] || "").trim();
+  if (jenisKonten.toLowerCase() !== CONFIG.SUPPORTED_JENIS_KONTEN.toLowerCase()) return false;
+
   const production = String(row[CONFIG.PRODUCTION_COLUMN] || "").trim();
   if (production !== CONFIG.PRODUCTION_DONE_VALUE) return false;
 
