@@ -49,7 +49,9 @@ Tiktok: @shoepolice__
 📩 Business Inquiries: igshoepolice@gmail.com`,
 
   INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
-  INSIGHTS_VIDEO_SHEET_NAME: "Youtube Sp",
+  INSIGHTS_SHORTS_SHEET_NAME: "Shorts",
+  INSIGHTS_LANDSCAPE_SHEET_NAME: "Landscape Videos",
+  SHORTS_MAX_DURATION_SEC: 270,
   INSIGHTS_ACCOUNT_SHEET_NAME: "Youtube Account",
   COMMENTS_SHEET_NAME: "Youtube Sp Comments",
   STATE_SHEET_NAME: "_State",
