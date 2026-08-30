@@ -72,18 +72,18 @@ function parseFlexibleDate(value) {
 }
 
 function toSheetDateString(date, timezone = "Asia/Jakarta") {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    month: "numeric",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
   }).formatToParts(date);
   const get = (type) => parts.find((p) => p.type === type).value;
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  return `${get("month")}/${get("day")}/${get("year")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 module.exports = {
