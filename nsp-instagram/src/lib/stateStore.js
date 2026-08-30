@@ -45,4 +45,21 @@ async function deleteState(sheets, key) {
   await setState(sheets, key, "");
 }
 
-module.exports = { getState, setState, deleteState };
+/**
+ * Lapor status backfill ke GitHub Actions (step output `done`) supaya workflow bisa
+ * memutuskan lanjut batch berikutnya atau berhenti. Aman dipanggil di lokal (no-op).
+ */
+function reportBackfillDone(done) {
+  const value = done ? "true" : "false";
+  const outFile = process.env.GITHUB_OUTPUT;
+  if (outFile) {
+    try {
+      require("fs").appendFileSync(outFile, `done=${value}\n`);
+    } catch (err) {
+      console.log(`(info) gagal tulis GITHUB_OUTPUT: ${err.message}`);
+    }
+  }
+  console.log(`BACKFILL_STATUS done=${value}`);
+}
+
+module.exports = { getState, setState, deleteState, reportBackfillDone };

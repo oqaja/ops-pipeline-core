@@ -60,6 +60,13 @@ const CONFIG = {
   INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
   MAX_INSIGHTS_PAGES: 10,
 
+  // Format tampilan tanggal yang SERAGAM di semua sheet insight (IG/NSP/TikTok/YouTube).
+  // Nilai tetap disimpan sebagai datetime asli; ini cuma number-format tampilannya.
+  // Butuh locale spreadsheet = id_ID supaya "mmm" render "Agu" (bukan "Aug").
+  POST_DATE_FORMAT: "dd mmm yyyy hh:mm",
+  ACCOUNT_DATE_FORMAT: "dd mmm yyyy",
+  SPREADSHEET_LOCALE: "id_ID",
+
   MEDIA_METRICS: ["reach", "views", "saved", "shares", "total_interactions"],
   ACCOUNT_METRICS: ["reach", "views", "accounts_engaged", "total_interactions"],
 };

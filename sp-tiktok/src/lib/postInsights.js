@@ -1,57 +1,18 @@
 const { TIKTOK_INSIGHT_CONFIG } = require("./config");
 const { toSheetDateString } = require("./dateUtils");
 const { getValidTikTokToken } = require("./tiktokAuth");
+const {
+  ensureSheetWithHeaders, upsertRowByKey, sortByColumnDesc, getHeaderColumnMap,
+  dedupeSheetByKey, applyColumnDateFormat, normalizeDateColumn, ensureSpreadsheetLocale,
+} = require("./sheetsHelper");
+const { getState, setState, deleteState, reportBackfillDone } = require("./stateStore");
 
-async function ensureSheetWithHeader(sheets, spreadsheetId, sheetName, headers) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId });
-  const exists = meta.data.sheets.some((s) => s.properties.title === sheetName);
-
-  if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: { requests: [{ addSheet: { properties: { title: sheetName } } }] },
-    });
-  }
-
-  const check = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetName}!A1:A1`,
-  });
-  if (!check.data.values || check.data.values.length === 0) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!A1`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [headers] },
-    });
-  }
-}
-
-async function getAllTikTokVideos(accessToken) {
-  let videos = [];
-  let cursor = 0;
-  let hasMore = true;
-  const startTime = Date.now();
-  const maxRuntimeMs = 4.5 * 60 * 1000;
-
-  while (hasMore) {
-    if (Date.now() - startTime > maxRuntimeMs) {
-      console.log(`Waktu mepet, stop ambil video di ${videos.length}`);
-      break;
-    }
-
-    const result = await fetchVideoListWithRetry(accessToken, cursor);
-    if (!result) break;
-
-    videos = videos.concat(result.videos);
-    hasMore = result.hasMore;
-    cursor = result.cursor;
-
-    await new Promise((r) => setTimeout(r, 800));
-  }
-
-  return videos;
-}
+const CFG = TIKTOK_INSIGHT_CONFIG;
+const VIDEO_HEADERS = [
+  "Judul/Deskripsi", "Tanggal Upload", "Video ID", "Link Video",
+  "Views", "Likes", "Comments", "Shares", "Terakhir Update",
+];
+const DATE_COLS = ["Tanggal Upload", "Terakhir Update"];
 
 async function fetchVideoListWithRetry(accessToken, cursor, retries = 0) {
   const maxRetries = 4;
@@ -75,8 +36,7 @@ async function fetchVideoListWithRetry(accessToken, cursor, retries = 0) {
   } catch (e) {
     console.log(`Respons bukan JSON (status ${response.status}): ${rawText.slice(0, 200)}`);
     if (retries < maxRetries) {
-      const waitTime = (retries + 1) * 3000;
-      await new Promise((r) => setTimeout(r, waitTime));
+      await new Promise((r) => setTimeout(r, (retries + 1) * 3000));
       return fetchVideoListWithRetry(accessToken, cursor, retries + 1);
     }
     return null;
@@ -97,6 +57,77 @@ async function fetchVideoListWithRetry(accessToken, cursor, retries = 0) {
   return null;
 }
 
+/** Ambil beberapa halaman video mulai dari startCursor. Balikin { videos, cursor, hasMore }. */
+async function fetchVideoPages(accessToken, { startCursor = 0, maxPages }) {
+  let videos = [];
+  let cursor = startCursor;
+  let hasMore = true;
+  let pages = 0;
+  const startTime = Date.now();
+  const maxRuntimeMs = 4.5 * 60 * 1000;
+
+  while (hasMore && pages < maxPages) {
+    if (Date.now() - startTime > maxRuntimeMs) {
+      console.log(`Waktu mepet, stop ambil video di ${videos.length}.`);
+      break;
+    }
+    const result = await fetchVideoListWithRetry(accessToken, cursor);
+    if (!result) break;
+    videos = videos.concat(result.videos);
+    hasMore = result.hasMore;
+    cursor = result.cursor;
+    pages++;
+    await new Promise((r) => setTimeout(r, 800));
+  }
+
+  return { videos, cursor, hasMore };
+}
+
+function videoToRow(v) {
+  const title = v.title || (v.video_description ? v.video_description.substring(0, 80) : "Video " + v.id);
+  return [
+    title,
+    v.create_time ? new Date(v.create_time * 1000) : "",
+    v.id,
+    v.share_url || "",
+    v.view_count || 0,
+    v.like_count || 0,
+    v.comment_count || 0,
+    v.share_count || 0,
+    new Date(),
+  ];
+}
+
+function parseDateCell(v) {
+  if (v instanceof Date) return v;
+  const d = new Date(String(v).replace(" ", "T"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function writeVideos(sheets, videos) {
+  for (const v of videos) {
+    if (!v || !v.id) continue;
+    await upsertRowByKey(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, "Video ID", v.id, videoToRow(v));
+  }
+}
+
+/** Dedupe + format tanggal seragam + sort terbaru-di-atas. */
+async function finalizeSheet(sheets, { normalize = false } = {}) {
+  await dedupeSheetByKey(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, "Video ID", "Terakhir Update");
+  const hm = await getHeaderColumnMap(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME);
+  for (const col of DATE_COLS) {
+    if (normalize) {
+      await normalizeDateColumn(
+        sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, hm[col],
+        parseDateCell, (d) => toSheetDateString(d)
+      );
+    }
+    await applyColumnDateFormat(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, hm[col], CFG.POST_DATE_FORMAT);
+  }
+  await sortByColumnDesc(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, "Tanggal Upload");
+}
+
+/** Refresh insight video TERBARU (RECENT_PAGES halaman pertama). Untuk histori penuh pakai backfillAllVideos. */
 async function pullTikTokInsights({ sheets }) {
   const accessToken = await getValidTikTokToken();
   if (!accessToken) {
@@ -104,62 +135,63 @@ async function pullTikTokInsights({ sheets }) {
     return;
   }
 
-  const spreadsheetId = TIKTOK_INSIGHT_CONFIG.INSIGHTS_SPREADSHEET_ID;
-  const sheetName = TIKTOK_INSIGHT_CONFIG.VIDEO_SHEET_NAME;
-  const headers = ["Judul/Deskripsi", "Tanggal Upload", "Video ID", "Link Video", "Views", "Likes", "Comments", "Shares", "Terakhir Update"];
+  await ensureSheetWithHeaders(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, VIDEO_HEADERS);
+  await ensureSpreadsheetLocale(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.SPREADSHEET_LOCALE);
 
-  await ensureSheetWithHeader(sheets, spreadsheetId, sheetName, headers);
-
-  const videos = await getAllTikTokVideos(accessToken);
-  console.log(`Ketemu ${videos.length} video TikTok, mulai tulis ke sheet...`);
-
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: sheetName });
-  const existingData = existing.data.values || [headers];
-  const header = existingData[0];
-  const videoIdCol = header.indexOf("Video ID");
-
-  const idToRowIndex = {};
-  for (let i = 1; i < existingData.length; i++) {
-    idToRowIndex[existingData[i][videoIdCol]] = i;
-  }
-
-  const newRows = [];
-
-  videos.forEach((v) => {
-    const title = v.title || (v.video_description ? v.video_description.substring(0, 80) : "Video " + v.id);
-    const rowData = [
-      title,
-      v.create_time ? toSheetDateString(new Date(v.create_time * 1000)) : "",
-      v.id,
-      v.share_url || "",
-      v.view_count || 0,
-      v.like_count || 0,
-      v.comment_count || 0,
-      v.share_count || 0,
-      toSheetDateString(new Date()),
-    ];
-
-    if (idToRowIndex.hasOwnProperty(v.id)) {
-      existingData[idToRowIndex[v.id]] = rowData;
-    } else {
-      newRows.push(rowData);
-    }
-  });
-
-  const finalData = existingData.slice(1).concat(newRows);
-
-  finalData.sort((a, b) => new Date(b[1]) - new Date(a[1]));
-
-  if (finalData.length > 0) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!A2`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: finalData },
-    });
-  }
-
-  console.log(`Selesai. Total ${finalData.length} baris di sheet TikTok.`);
+  const { videos } = await fetchVideoPages(accessToken, { startCursor: 0, maxPages: CFG.RECENT_PAGES });
+  console.log(`Ketemu ${videos.length} video terbaru, tulis ke sheet...`);
+  await writeVideos(sheets, videos);
+  await finalizeSheet(sheets);
+  console.log("Refresh TikTok selesai.");
 }
 
-module.exports = { pullTikTokInsights };
+/**
+ * Backfill SEMUA video, batch demi batch (BACKFILL_MAX_PAGES_PER_RUN halaman per run),
+ * cursor + flag DONE di tab _State. Begitu has_more = false -> set DONE, rantai backfill
+ * berhenti sendiri.
+ */
+async function backfillAllVideos({ sheets }) {
+  const alreadyDone = await getState(sheets, CFG.BACKFILL_DONE_KEY);
+  if (alreadyDone === "true") {
+    console.log("Backfill TikTok sudah selesai total sebelumnya - tidak ada yang dikerjakan.");
+    console.log(`(Kalau mau ulang dari awal, hapus baris '${CFG.BACKFILL_DONE_KEY}' di tab _State.)`);
+    reportBackfillDone(true);
+    return;
+  }
+
+  const accessToken = await getValidTikTokToken();
+  if (!accessToken) {
+    console.log("Gagal dapat access token.");
+    reportBackfillDone(false);
+    return;
+  }
+
+  await ensureSheetWithHeaders(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.VIDEO_SHEET_NAME, VIDEO_HEADERS);
+  await ensureSpreadsheetLocale(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.SPREADSHEET_LOCALE);
+
+  const savedCursor = await getState(sheets, CFG.BACKFILL_CURSOR_KEY);
+  const startCursor = savedCursor ? Number(savedCursor) : 0;
+  if (!savedCursor) await finalizeSheet(sheets, { normalize: true });
+  console.log(savedCursor ? `Lanjut backfill dari cursor ${startCursor}...` : "Mulai backfill dari video terbaru, mundur ke terlama.");
+
+  const { videos, cursor, hasMore } = await fetchVideoPages(accessToken, {
+    startCursor,
+    maxPages: CFG.BACKFILL_MAX_PAGES_PER_RUN,
+  });
+  console.log(`Batch ini: ${videos.length} video.`);
+  await writeVideos(sheets, videos);
+  await finalizeSheet(sheets);
+
+  if (hasMore) {
+    await setState(sheets, CFG.BACKFILL_CURSOR_KEY, String(cursor));
+    console.log("=== Batch selesai - belum tuntas, lanjut otomatis di run berikutnya ===");
+    reportBackfillDone(false);
+  } else {
+    await deleteState(sheets, CFG.BACKFILL_CURSOR_KEY);
+    await setState(sheets, CFG.BACKFILL_DONE_KEY, "true");
+    console.log("=== BACKFILL TIKTOK SELESAI TOTAL ===");
+    reportBackfillDone(true);
+  }
+}
+
+module.exports = { pullTikTokInsights, backfillAllVideos };

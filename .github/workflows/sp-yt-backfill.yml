@@ -1,7 +1,8 @@
-name: SP YouTube - Post Insights
+name: SP YouTube - Backfill Post Insights (Self-Chaining)
+# Trigger SEKALI lewat "Run workflow". Tiap batch nge-trigger batch berikutnya sendiri
+# sampai flag DONE di tab _State ke-set, lalu rantai berhenti total.
+# Reset: hapus baris "SP_YT_BACKFILL_DONE" di tab _State.
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
 concurrency:
   group: sp-yt-insights
@@ -20,7 +21,9 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npm run post-insights
+      - name: Backfill batch
+        id: backfill
+        run: npm run backfill-post-insights
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
           GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
@@ -28,3 +31,10 @@ jobs:
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.SP_YT_REFRESH_TOKEN }}
           SECRETS_WRITE_PAT: ${{ secrets.SECRETS_WRITE_PAT }}
+      - name: Lanjut batch berikutnya
+        if: steps.backfill.outputs.done != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_WRITE_PAT }}
+        run: |
+          sleep 20
+          gh workflow run sp-yt-backfill.yml

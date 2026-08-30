@@ -1,6 +1,10 @@
 const { TIKTOK_INSIGHT_CONFIG } = require("./config");
-const { toSheetDateString } = require("./dateUtils");
 const { getValidTikTokToken } = require("./tiktokAuth");
+const {
+  ensureSheetWithHeaders, appendRow, sortByColumnDesc, getHeaderColumnMap, applyColumnDateFormat,
+} = require("./sheetsHelper");
+
+const CFG = TIKTOK_INSIGHT_CONFIG;
 
 async function pullTikTokAccountSnapshot({ sheets }) {
   const accessToken = await getValidTikTokToken();
@@ -21,44 +25,22 @@ async function pullTikTokAccountSnapshot({ sheets }) {
   }
 
   const user = data.data.user;
-  const spreadsheetId = TIKTOK_INSIGHT_CONFIG.INSIGHTS_SPREADSHEET_ID;
-  const sheetName = TIKTOK_INSIGHT_CONFIG.ACCOUNT_SHEET_NAME;
   const headers = ["Tanggal", "Nama Akun", "Followers", "Following", "Total Likes", "Total Video"];
 
-  const meta = await sheets.spreadsheets.get({ spreadsheetId });
-  const exists = meta.data.sheets.some((s) => s.properties.title === sheetName);
-  if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: { requests: [{ addSheet: { properties: { title: sheetName } } }] },
-    });
-  }
-  const check = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A1:A1` });
-  if (!check.data.values || check.data.values.length === 0) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!A1`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [headers] },
-    });
-  }
+  await ensureSheetWithHeaders(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, headers);
 
-  const newRow = [
-    toSheetDateString(new Date()),
+  await appendRow(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, [
+    new Date(),
     user.display_name || "",
     user.follower_count || 0,
     user.following_count || 0,
     user.likes_count || 0,
     user.video_count || 0,
-  ];
+  ]);
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: sheetName,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [newRow] },
-  });
+  const hm = await getHeaderColumnMap(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME);
+  await applyColumnDateFormat(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, hm["Tanggal"], CFG.ACCOUNT_DATE_FORMAT);
+  await sortByColumnDesc(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, "Tanggal");
 
   console.log(`Snapshot TikTok tersimpan: ${user.follower_count} followers`);
 }

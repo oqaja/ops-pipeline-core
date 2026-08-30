@@ -1,7 +1,8 @@
-name: SP TikTok - Post Insights
+name: SP TikTok - Backfill Post Insights (Self-Chaining)
+# Trigger SEKALI lewat "Run workflow". Tiap batch nge-trigger batch berikutnya sendiri
+# sampai flag DONE di tab _State ke-set, lalu rantai berhenti total.
+# Reset: hapus baris "TIKTOK_BACKFILL_DONE" di tab _State.
 on:
-  schedule:
-    - cron: '0 13 * * *'
   workflow_dispatch:
 concurrency:
   group: sp-tiktok-insights
@@ -20,10 +21,19 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npm run post-insights
+      - name: Backfill batch
+        id: backfill
+        run: npm run backfill-post-insights
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
           SECRETS_WRITE_PAT: ${{ secrets.SECRETS_WRITE_PAT }}
+      - name: Lanjut batch berikutnya
+        if: steps.backfill.outputs.done != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_WRITE_PAT }}
+        run: |
+          sleep 20
+          gh workflow run sp-tiktok-backfill.yml

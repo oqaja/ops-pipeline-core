@@ -56,7 +56,16 @@ Tiktok: @shoepolice__
   COMMENTS_SHEET_NAME: "Youtube Sp Comments",
   STATE_SHEET_NAME: "_State",
 
-  MAX_INSIGHTS_BATCH: 50, // video per run buat insight, sama pola "cap per run" kayak IG backfill
+  MAX_INSIGHTS_BATCH: 50, // video per run buat refresh insight terbaru
+  BACKFILL_MAX_PAGES_PER_RUN: 2, // 2 x 50 = 100 video per batch backfill (aman dari rate limit Sheets)
+  BACKFILL_CURSOR_KEY: "SP_YT_BACKFILL_CURSOR",
+  BACKFILL_DONE_KEY: "SP_YT_BACKFILL_DONE",
+
+  // Format tampilan tanggal SERAGAM lintas platform. Nilai tetap datetime asli.
+  // Butuh locale spreadsheet = id_ID supaya "mmm" render "Agu".
+  POST_DATE_FORMAT: "dd mmm yyyy hh:mm",
+  ACCOUNT_DATE_FORMAT: "dd mmm yyyy",
+  SPREADSHEET_LOCALE: "id_ID",
 };
 
 function getSecret(name) {

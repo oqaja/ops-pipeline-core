@@ -1,15 +1,24 @@
-const { CONFIG } = require("./config");
+/**
+ * stateStore.js
+ * Progress cursor + flag (backfill) disimpan di tab kecil "_State" di spreadsheet
+ * Insights - persisten di luar runner GitHub Actions yang sekali-pakai.
+ * Pola sama dengan sp-instagram/src/lib/stateStore.js.
+ */
+
+const { TIKTOK_INSIGHT_CONFIG } = require("./config");
 const { ensureSheetWithHeaders, readSheetAsObjects, upsertRowByKey } = require("./sheetsHelper");
 
 const STATE_HEADERS = ["KEY", "VALUE", "UPDATED_AT"];
+const SS_ID = TIKTOK_INSIGHT_CONFIG.INSIGHTS_SPREADSHEET_ID;
+const STATE_SHEET = TIKTOK_INSIGHT_CONFIG.STATE_SHEET_NAME;
 
 async function ensureStateSheet(sheets) {
-  await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.STATE_SHEET_NAME, STATE_HEADERS);
+  await ensureSheetWithHeaders(sheets, SS_ID, STATE_SHEET, STATE_HEADERS);
 }
 
 async function getState(sheets, key) {
   await ensureStateSheet(sheets);
-  const { rows } = await readSheetAsObjects(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.STATE_SHEET_NAME);
+  const { rows } = await readSheetAsObjects(sheets, SS_ID, STATE_SHEET);
   const found = rows.find((r) => String(r["KEY"] || "").trim() === key);
   if (!found) return null;
   const value = String(found["VALUE"] || "");
@@ -18,7 +27,7 @@ async function getState(sheets, key) {
 
 async function setState(sheets, key, value) {
   await ensureStateSheet(sheets);
-  await upsertRowByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.STATE_SHEET_NAME, "KEY", key, [key, value, new Date()]);
+  await upsertRowByKey(sheets, SS_ID, STATE_SHEET, "KEY", key, [key, value, new Date().toISOString()]);
 }
 
 async function deleteState(sheets, key) {
