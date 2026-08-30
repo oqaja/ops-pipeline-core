@@ -15,6 +15,7 @@ jobs:
         working-directory: sp-youtube
     permissions:
       contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,7 +35,7 @@ jobs:
       - name: Lanjut batch berikutnya
         if: steps.backfill.outputs.done != 'true'
         env:
-          GH_TOKEN: ${{ secrets.SECRETS_WRITE_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           sleep 20
           gh workflow run sp-yt-backfill.yml
