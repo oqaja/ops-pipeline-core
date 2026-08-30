@@ -52,7 +52,7 @@ Tiktok: @shoepolice__
   INSIGHTS_SHORTS_SHEET_NAME: "Shorts",
   INSIGHTS_LANDSCAPE_SHEET_NAME: "Landscape Videos",
   SHORTS_MAX_DURATION_SEC: 270,
-  INSIGHTS_ACCOUNT_SHEET_NAME: "Youtube Account",
+  INSIGHTS_ACCOUNT_SHEET_NAME: "YouTube Account",
   COMMENTS_SHEET_NAME: "Youtube Sp Comments",
   STATE_SHEET_NAME: "_State",
 
