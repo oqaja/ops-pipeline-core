@@ -71,19 +71,24 @@ function parseFlexibleDate(value) {
   return isNaN(manualDate.getTime()) ? null : manualDate;
 }
 
+/**
+ * Format Date jadi "YYYY-MM-DD HH:mm:ss" WIB - bentuk kanonik yang SELALU dikenali
+ * Google Sheets sebagai datetime asli, lepas dari locale spreadsheet. Sama persis
+ * dengan versi di sp-instagram / sp-tiktok supaya tampilan seragam lintas platform.
+ */
 function toSheetDateString(date, timezone = "Asia/Jakarta") {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
-    month: "numeric",
-    day: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
   }).formatToParts(date);
   const get = (type) => parts.find((p) => p.type === type).value;
-  return `${get("month")}/${get("day")}/${get("year")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 module.exports = {

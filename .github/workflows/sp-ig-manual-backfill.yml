@@ -9,6 +9,9 @@ on:
         options:
           - post-insights
           - comments
+concurrency:
+  group: sp-ig-insights
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest

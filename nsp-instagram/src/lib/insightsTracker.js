@@ -1,9 +1,12 @@
 const { CONFIG } = require("./config");
 const { callGraphApi } = require("./instagramPublisher");
 const { getIgAccessToken } = require("./config");
-const { readSheetAsObjects, ensureSheetWithHeaders, upsertRowByKey, sortByColumnDesc, applyDateFormats, getHeaderColumnMap } = require("./sheetsHelper");
-const { getState, setState, deleteState } = require("./stateStore");
-const { parseFlexibleDate } = require("./dateUtils");
+const {
+  readSheetAsObjects, ensureSheetWithHeaders, upsertRowByKey, sortByColumnDesc, getHeaderColumnMap,
+  dedupeSheetByKey, applyColumnDateFormat, normalizeDateColumn, ensureSpreadsheetLocale,
+} = require("./sheetsHelper");
+const { getState, setState, deleteState, reportBackfillDone } = require("./stateStore");
+const { parseFlexibleDate, toSheetDateString } = require("./dateUtils");
 
 const POST_INSIGHT_HEADERS = [
   "POST ID IG", "SUMBER", "JUDUL KONTEN", "JENIS KONTEN", "TANGGAL UPLOAD",
@@ -14,8 +17,24 @@ const POST_INSIGHT_HEADERS = [
 const ACCOUNT_INSIGHT_HEADERS = ["TANGGAL", "REACH", "VIEWS", "ACCOUNTS ENGAGED", "TOTAL INTERACTIONS", "FOLLOWERS"];
 
 const BACKFILL_MAX_PAGES_PER_RUN = 2; // 2 halaman x 25 post = 50 post per run, biar aman dari rate limit
-const BACKFILL_CURSOR_KEY = "SP_BACKFILL_CURSOR";
-const BACKFILL_DONE_KEY = "SP_BACKFILL_DONE";
+// Key state di-namespace per AKUN (pakai nama sheet insight) supaya SP & NSP - yang
+// share spreadsheet _State yang sama - tidak saling menimpa cursor / flag DONE.
+const BACKFILL_CURSOR_KEY = `${CONFIG.INSIGHTS_POST_SHEET_NAME}::BACKFILL_CURSOR`;
+const BACKFILL_DONE_KEY = `${CONFIG.INSIGHTS_POST_SHEET_NAME}::BACKFILL_DONE`;
+
+/** Terapkan format tanggal seragam + rapikan sel warisan untuk sheet insight post. */
+async function ensurePostDateFormatting(sheets, { normalize = false } = {}) {
+  const headerMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME);
+  for (const col of ["TANGGAL UPLOAD", "TERAKHIR DIUPDATE"]) {
+    if (normalize) {
+      await normalizeDateColumn(
+        sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, headerMap[col],
+        parseFlexibleDate, (d) => toSheetDateString(d)
+      );
+    }
+    await applyColumnDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, headerMap[col], CONFIG.POST_DATE_FORMAT);
+  }
+}
 
 async function fetchSingleMetric(objectId, metric, extraParams, accessToken) {
   try {
@@ -129,13 +148,9 @@ async function processSingleMediaInsight(media, contextMap, accessToken, sheets)
     media.permalink || "", now,
   ];
 
-  const writtenRow = await upsertRowByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", postId, rowData);
-
-  const insightsHeaderMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME);
-  await applyDateFormats(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, writtenRow, [
-    { colNumber: insightsHeaderMap["TANGGAL UPLOAD"], pattern: "dd/mm/yyyy hh:mm" },
-    { colNumber: insightsHeaderMap["TERAKHIR DIUPDATE"], pattern: "dd/mm/yyyy hh:mm" },
-  ]);
+  // Number-format tanggal diterapkan sekali per-kolom di pemanggil (ensurePostDateFormatting),
+  // bukan per-baris di sini.
+  await upsertRowByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", postId, rowData);
 }
 
 async function runPostInsights(sheets) {
@@ -154,6 +169,8 @@ async function runPostInsights(sheets) {
     await processSingleMediaInsight(media, contextMap, accessToken, sheets);
   }
 
+  await dedupeSheetByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", "TERAKHIR DIUPDATE");
+  await ensurePostDateFormatting(sheets);
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "TANGGAL UPLOAD");
   console.log(`Selesai update insight per-post (${allMedia.length} post).`);
 }
@@ -171,7 +188,8 @@ async function backfillAllPosts(sheets) {
   const alreadyDone = await getState(sheets, BACKFILL_DONE_KEY);
   if (alreadyDone === "true") {
     console.log("Backfill sudah pernah selesai total sebelumnya - tidak ada yang perlu dikerjakan lagi.");
-    console.log("(Kalau mau backfill ulang dari awal, hapus baris 'SP_BACKFILL_DONE' di tab _State secara manual.)");
+    console.log(`(Kalau mau backfill ulang dari awal, hapus baris '${BACKFILL_DONE_KEY}' di tab _State secara manual.)`);
+    reportBackfillDone(true);
     return;
   }
 
@@ -183,6 +201,12 @@ async function backfillAllPosts(sheets) {
   console.log(nextUrl ? "Melanjutkan dari progress run sebelumnya..." : "Mulai dari awal (post TERBARU dulu, mundur ke yang PALING LAMA).");
 
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, POST_INSIGHT_HEADERS);
+  await ensureSpreadsheetLocale(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.SPREADSHEET_LOCALE);
+  if (!nextUrl) {
+    // Sekali di awal siklus: bersihkan dobel warisan + rapikan sel tanggal-teks lama.
+    await dedupeSheetByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", "TERAKHIR DIUPDATE");
+    await ensurePostDateFormatting(sheets, { normalize: true });
+  }
   const contextMap = await getSheetContextMap(sheets);
 
   let totalProcessed = 0;
@@ -225,14 +249,18 @@ async function backfillAllPosts(sheets) {
     }
   }
 
+  await dedupeSheetByKey(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "POST ID IG", "TERAKHIR DIUPDATE");
+  await ensurePostDateFormatting(sheets);
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_POST_SHEET_NAME, "TANGGAL UPLOAD");
 
   if (habisTotal) {
     await deleteState(sheets, BACKFILL_CURSOR_KEY);
     await setState(sheets, BACKFILL_DONE_KEY, "true");
     console.log(`=== BACKFILL SELESAI TOTAL - ${totalProcessed} post diproses di batch terakhir ini. ===`);
+    reportBackfillDone(true);
   } else {
     console.log(`=== Batch ini selesai (${totalProcessed} post). Belum tuntas semua - lanjut otomatis di run berikutnya. ===`);
+    reportBackfillDone(false);
   }
 }
 
@@ -265,13 +293,8 @@ async function runAccountInsights(sheets) {
     today, values.reach, values.views, values.accounts_engaged, values.total_interactions, followersCount,
   ]);
 
-  const { readSheetAsObjects: readRows } = require("./sheetsHelper");
-  const { rows } = await readRows(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
-  const lastRow = rows.length + 1;
   const accountHeaderMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
-  await applyDateFormats(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, lastRow, [
-    { colNumber: accountHeaderMap["TANGGAL"], pattern: "dd/mm/yyyy" },
-  ]);
+  await applyColumnDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, accountHeaderMap["TANGGAL"], CONFIG.ACCOUNT_DATE_FORMAT);
 
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "TANGGAL");
 
@@ -352,6 +375,8 @@ async function backfillAccountInsights(sheets, daysBack = 30) {
     }
   }
 
+  const accHeaderMap = await getHeaderColumnMap(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME);
+  await applyColumnDateFormat(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, accHeaderMap["TANGGAL"], CONFIG.ACCOUNT_DATE_FORMAT);
   await sortByColumnDesc(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "TANGGAL");
   console.log(`=== BACKFILL selesai: ${addedCount} baris baru, ${updatedCount} baris diperbarui ===`);
 }

@@ -184,18 +184,181 @@ async function upsertRowByKey(sheets, spreadsheetId, sheetName, keyColumnName, k
   const keyCol = headerMap[keyColumnName];
   if (!keyCol) throw new Error(`Kolom '${keyColumnName}' tidak ketemu di sheet '${sheetName}'.`);
 
+  const target = String(keyValue).trim();
   const { rows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
-  const existing = rows.find((r) => String(r[keyColumnName] || "").trim() === String(keyValue));
+  const matches = rows.filter((r) => String(r[keyColumnName] || "").trim() === target);
 
-  if (existing) {
-    await setRowValues(sheets, spreadsheetId, sheetName, existing._rowNumber, rowData);
-    return existing._rowNumber;
+  if (matches.length > 0) {
+    const first = matches[0];
+    await setRowValues(sheets, spreadsheetId, sheetName, first._rowNumber, rowData);
+    // Self-healing: kalau key yang sama muncul di >1 baris (dobel warisan), sisakan yang pertama.
+    if (matches.length > 1) {
+      await deleteRowsByNumbers(sheets, spreadsheetId, sheetName, matches.slice(1).map((r) => r._rowNumber));
+    }
+    return first._rowNumber;
   }
 
   await appendRow(sheets, spreadsheetId, sheetName, rowData);
   const { rows: afterRows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
   return afterRows.length + 1;
 }
+
+/** Hapus baris berdasarkan nomor baris (1-indexed). Diurut menurun supaya index tidak bergeser. */
+async function deleteRowsByNumbers(sheets, spreadsheetId, sheetName, rowNumbers) {
+  if (!rowNumbers || rowNumbers.length === 0) return;
+  const meta = await getSheetMeta(sheets, spreadsheetId, sheetName);
+  if (!meta.exists) return;
+
+  const sorted = [...new Set(rowNumbers)].sort((a, b) => b - a);
+  const requests = sorted.map((rowNumber) => ({
+    deleteDimension: {
+      range: { sheetId: meta.sheetId, dimension: "ROWS", startIndex: rowNumber - 1, endIndex: rowNumber },
+    },
+  }));
+
+  await withRateLimitRetry(
+    () => sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } }),
+    "deleteRowsByNumbers"
+  );
+}
+
+/**
+ * Buang baris duplikat: untuk tiap value di keyColumnName yang muncul >1x, sisakan
+ * SATU baris (yang tiebreakColumnName-nya paling besar/baru; kalau tidak ada tiebreak,
+ * baris paling bawah), hapus sisanya. Return jumlah baris yang dihapus.
+ */
+async function dedupeSheetByKey(sheets, spreadsheetId, sheetName, keyColumnName, tiebreakColumnName) {
+  const { rows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
+  if (rows.length < 2) return 0;
+
+  const groups = new Map();
+  for (const row of rows) {
+    const key = String(row[keyColumnName] || "").trim();
+    if (key === "") continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  const toDelete = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    let keep = group[0];
+    for (const row of group) {
+      const rv = tiebreakColumnName ? Number(row[tiebreakColumnName]) || 0 : row._rowNumber;
+      const kv = tiebreakColumnName ? Number(keep[tiebreakColumnName]) || 0 : keep._rowNumber;
+      if (rv >= kv) keep = row;
+    }
+    for (const row of group) if (row._rowNumber !== keep._rowNumber) toDelete.push(row._rowNumber);
+  }
+
+  if (toDelete.length === 0) return 0;
+  await deleteRowsByNumbers(sheets, spreadsheetId, sheetName, toDelete);
+  console.log(`  (dedupe) ${sheetName}: ${toDelete.length} baris duplikat dihapus.`);
+  return toDelete.length;
+}
+
+/** Terapkan number-format tanggal ke SELURUH kolom (mulai baris 2). Sekali panggil, semua baris seragam. */
+async function applyColumnDateFormat(sheets, spreadsheetId, sheetName, colNumber, pattern) {
+  if (!colNumber) return;
+  const meta = await getSheetMeta(sheets, spreadsheetId, sheetName);
+  if (!meta.exists) return;
+
+  const type = /[hH]/.test(pattern) ? "DATE_TIME" : "DATE";
+  await withRateLimitRetry(
+    () =>
+      sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              repeatCell: {
+                range: {
+                  sheetId: meta.sheetId,
+                  startRowIndex: 1,
+                  startColumnIndex: colNumber - 1,
+                  endColumnIndex: colNumber,
+                },
+                cell: { userEnteredFormat: { numberFormat: { type, pattern } } },
+                fields: "userEnteredFormat.numberFormat",
+              },
+            },
+          ],
+        },
+      }),
+    "applyColumnDateFormat"
+  );
+}
+
+/**
+ * Rapikan kolom tanggal yang terlanjur tersimpan sebagai TEKS (bukan datetime asli):
+ * baca tiap sel, parse pakai parseFn, tulis ulang pakai formatFn. Sel yang sudah
+ * berupa angka serial dibiarkan. Return jumlah sel yang diperbaiki.
+ */
+async function normalizeDateColumn(sheets, spreadsheetId, sheetName, colNumber, parseFn, formatFn) {
+  if (!colNumber) return 0;
+  const colLetter = columnNumberToLetter(colNumber);
+  const res = await withRateLimitRetry(
+    () =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${sheetName}'!${colLetter}2:${colLetter}`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+        dateTimeRenderOption: "SERIAL_NUMBER",
+      }),
+    "normalizeDateColumn(read)"
+  );
+  const values = res.data.values || [];
+  if (values.length === 0) return 0;
+
+  const out = [];
+  let fixed = 0;
+  for (let i = 0; i < values.length; i++) {
+    const cell = values[i] && values[i].length ? values[i][0] : "";
+    if (typeof cell === "number") { out.push([cell]); continue; }
+    if (cell === "" || cell === null || cell === undefined) { out.push([""]); continue; }
+    const parsed = parseFn(cell);
+    if (parsed && !isNaN(parsed.getTime())) { out.push([formatFn(parsed)]); fixed++; }
+    else out.push([cell]);
+  }
+
+  if (fixed === 0) return 0;
+  await withRateLimitRetry(
+    () =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${sheetName}'!${colLetter}2:${colLetter}${out.length + 1}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: out },
+      }),
+    "normalizeDateColumn(write)"
+  );
+  console.log(`  (normalize) ${sheetName} kolom ${colLetter}: ${fixed} sel tanggal-teks dirapikan.`);
+  return fixed;
+}
+
+/** Pastikan locale spreadsheet = locale target (default id_ID), supaya "mmm" render "Agu" bukan "Aug". Idempoten. */
+async function ensureSpreadsheetLocale(sheets, spreadsheetId, locale = "id_ID") {
+  try {
+    const res = await withRateLimitRetry(
+      () => sheets.spreadsheets.get({ spreadsheetId, fields: "properties.locale" }),
+      "ensureSpreadsheetLocale(get)"
+    );
+    const current = res.data.properties && res.data.properties.locale;
+    if (current === locale) return;
+    await withRateLimitRetry(
+      () =>
+        sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: { requests: [{ updateSpreadsheetProperties: { properties: { locale }, fields: "locale" } }] },
+        }),
+      "ensureSpreadsheetLocale(set)"
+    );
+    console.log(`  (info) Locale spreadsheet di-set dari '${current || "?"}' ke '${locale}'.`);
+  } catch (err) {
+    console.log(`  (info) Gagal set locale spreadsheet: ${err.message}`);
+  }
+}
+
 
 async function sortByColumnDesc(sheets, spreadsheetId, sheetName, columnName) {
   const meta = await getSheetMeta(sheets, spreadsheetId, sheetName);
@@ -235,7 +398,12 @@ module.exports = {
   appendRow,
   ensureSheetWithHeaders,
   upsertRowByKey,
+  deleteRowsByNumbers,
+  dedupeSheetByKey,
   sortByColumnDesc,
+  applyColumnDateFormat,
+  normalizeDateColumn,
+  ensureSpreadsheetLocale,
   columnNumberToLetter,
   withRateLimitRetry,
   getSheetMeta,

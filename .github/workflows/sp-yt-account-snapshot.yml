@@ -4,7 +4,7 @@ on:
     - cron: '0 13 * * *'
   workflow_dispatch:
 concurrency:
-  group: sp-yt-account-snapshot
+  group: sp-yt-insights
   cancel-in-progress: false
 jobs:
   run:

@@ -2,7 +2,7 @@ try { require("dotenv").config(); } catch (e) {}
 const { getSheetsClient } = require("../src/lib/googleAuth");
 const { backfillAllPosts, backfillAccountInsights } = require("../src/lib/insightsTracker");
 
-// Jalankan manual lewat: gh workflow run backfill-insights.yml
+// Jalankan sekali lewat: gh workflow run sp-ig-backfill.yml (rantai batch berhenti sendiri saat DONE)
 // atau lokal: node scripts/run-backfill-post-insights.js [daysBackForAccount]
 (async () => {
   try {

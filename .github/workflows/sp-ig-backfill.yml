@@ -1,0 +1,35 @@
+name: SP IG - Backfill Post Insights (Self-Chaining)
+# Trigger SEKALI lewat "Run workflow". Tiap batch nge-trigger batch berikutnya sendiri
+# sampai flag DONE di tab _State ke-set, lalu rantai berhenti total (nggak ada runner
+# jalan lagi). Reset: hapus baris "Instagram Sp::BACKFILL_DONE" di tab _State.
+on:
+  workflow_dispatch:
+concurrency:
+  group: sp-ig-insights
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sp-instagram
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Backfill batch
+        id: backfill
+        run: npm run backfill-post-insights
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SP_IG_ACCESS_TOKEN: ${{ secrets.SP_IG_ACCESS_TOKEN }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
+      - name: Lanjut batch berikutnya
+        if: steps.backfill.outputs.done != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_WRITE_PAT }}
+        run: |
+          sleep 20
+          gh workflow run sp-ig-backfill.yml
