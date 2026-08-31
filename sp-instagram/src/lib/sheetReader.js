@@ -15,11 +15,17 @@ async function getReadyRows(sheets) {
   return rows.filter((row) => isReadyToPost(row, now));
 }
 
-/** Setara spIsReadyToPost_. */
+/** Setara spIsReadyToPost_. Debug log hanya untuk row akun ini biar tidak berisik. */
 function isReadyToPost(row, now) {
   const akun = String(row["AKUN"] || "").trim().toUpperCase();
-  if (akun !== "SP") return false;
+  if (akun !== CONFIG.AKUN) return false;
 
+  const reject = (alasan) => {
+    console.log(`  [skip ${CONFIG.AKUN}] '${row["JUDUL KONTEN"]}' - ${alasan} (TANGGAL=${JSON.stringify(row["TANGGAL"])}, JAM=${JSON.stringify(row[CONFIG.JAM_COLUMN])}, STATUS=${JSON.stringify(row[CONFIG.STATUS_COLUMN])})`);
+    return false;
+  };
+
+  // Status & jenis konten yang tidak cocok = row lama / bukan giliran -> skip diam-diam (biar log tidak penuh).
   const statusIg = String(row[CONFIG.STATUS_COLUMN] || "").trim().toUpperCase();
   const isApprovedStatus =
     statusIg === CONFIG.READY_STATUS_VALUE.toUpperCase() || statusIg === CONFIG.SCHEDULED_STATUS_VALUE.toUpperCase();
@@ -29,14 +35,15 @@ function isReadyToPost(row, now) {
   const isSupported = CONFIG.SUPPORTED_JENIS_KONTEN.some((allowed) => allowed.toLowerCase() === jenisKonten.toLowerCase());
   if (!isSupported) return false;
 
-  if (!isSameDateInTimezone(row["TANGGAL"], now, CONFIG.TIMEZONE)) return false;
+  if (!isSameDateInTimezone(row["TANGGAL"], now, CONFIG.TIMEZONE)) return reject("tanggal bukan hari ini / gagal di-parse");
 
   const jamUpMinutes = toMinutesOfDay(row[CONFIG.JAM_COLUMN]);
-  if (jamUpMinutes === null) return false;
+  if (jamUpMinutes === null) return reject("jam up kosong / gagal di-parse");
 
   const nowMinutes = nowMinutesInTimezone(CONFIG.TIMEZONE);
-  if (jamUpMinutes > nowMinutes) return false;
+  if (jamUpMinutes > nowMinutes) return reject(`belum waktunya (jam up ${jamUpMinutes}m > sekarang ${nowMinutes}m)`);
 
+  console.log(`  [siap ${CONFIG.AKUN}] '${row["JUDUL KONTEN"]}' - lolos semua cek.`);
   return true;
 }
 

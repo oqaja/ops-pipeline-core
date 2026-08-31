@@ -10,6 +10,26 @@
 const SHEETS_EPOCH_UTC_MS = Date.UTC(1899, 11, 30); // 30 Des 1899, sesuai epoch Google Sheets
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Nama bulan (Indonesia + Inggris, 3 huruf pertama) -> index 0-11. Kolom TANGGAL di
+// "KALENDER KONTEN" sering berupa teks seperti "31-Agu-2026" atau "31 Agu 2026", bukan
+// tanggal asli - tanpa ini parseInt("Agu") = NaN dan row NSP/SP tidak pernah kedeteksi.
+const BULAN_INDEX = {
+  jan: 0, feb: 1, mar: 2, apr: 3, mei: 4, may: 4, jun: 5, jul: 6,
+  agu: 7, aug: 7, agt: 7, sep: 8, okt: 9, oct: 9, nov: 10, des: 11, dec: 11,
+};
+
+/** Ubah token bulan (angka "1".."12" atau nama "Agu"/"Sep"/"Aug") jadi index 0-11. NaN kalau gagal. */
+function parseMonthToken(token) {
+  const s = String(token == null ? "" : token).trim().toLowerCase();
+  if (s === "") return NaN;
+  if (/^\d+$/.test(s)) {
+    const n = parseInt(s, 10);
+    return n >= 1 && n <= 12 ? n - 1 : NaN;
+  }
+  const key = s.slice(0, 3);
+  return Object.prototype.hasOwnProperty.call(BULAN_INDEX, key) ? BULAN_INDEX[key] : NaN;
+}
+
 function isSheetsSerialNumber(value) {
   return typeof value === "number" && !isNaN(value);
 }
@@ -41,10 +61,11 @@ function isSameDateInTimezone(value, now, timezone) {
     m = date.getUTCMonth();
     d = date.getUTCDate();
   } else if (typeof value === "string" && value.trim() !== "") {
-    const parts = value.trim().split(/[\/\-]/);
-    if (parts.length !== 3) return false;
+    // Terima "dd/mm/yyyy", "dd-mm-yyyy", "dd-Agu-yyyy", "dd Agu yyyy" (+ opsional " HH:mm" di belakang).
+    const parts = value.trim().split(/[\/\-\s]+/).filter(Boolean);
+    if (parts.length < 3) return false;
     d = parseInt(parts[0], 10);
-    m = parseInt(parts[1], 10) - 1;
+    m = parseMonthToken(parts[1]);
     y = parseInt(parts[2], 10);
     if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
   } else {
@@ -118,17 +139,26 @@ function parseFlexibleDate(value) {
     return isNaN(isoDate.getTime()) ? null : isoDate;
   }
 
-  const [datePart, timePart = "00:00"] = strValue.split(" ");
-  const dateSegments = datePart.split(/[\/\-]/);
-  if (dateSegments.length !== 3) return null;
+  // Pisahkan bagian jam ("HH:mm" / "HH.mm") di akhir string kalau ada.
+  let hours = 0;
+  let minutes = 0;
+  let datePart = strValue;
+  const timeMatch = strValue.match(/(\d{1,2})[:.](\d{2})(?::\d{2})?\s*$/);
+  if (timeMatch) {
+    hours = parseInt(timeMatch[1], 10) || 0;
+    minutes = parseInt(timeMatch[2], 10) || 0;
+    datePart = strValue.slice(0, timeMatch.index).trim();
+  }
 
-  const day = parseInt(dateSegments[0], 10);
-  const month = parseInt(dateSegments[1], 10) - 1;
-  const year = parseInt(dateSegments[2], 10);
+  const dateSegments = datePart.split(/[\/\-\s]+/).filter(Boolean);
+  if (dateSegments.length < 3) return null;
 
-  const timeSegments = timePart.split(":");
-  const hours = parseInt(timeSegments[0], 10) || 0;
-  const minutes = parseInt(timeSegments[1], 10) || 0;
+  // "2026-08-31" (tahun di depan) vs "31-Agu-2026" / "31/08/2026" (hari di depan).
+  const yearFirst = /^\d{4}$/.test(dateSegments[0]);
+  const day = parseInt(yearFirst ? dateSegments[2] : dateSegments[0], 10);
+  const month = parseMonthToken(dateSegments[1]);
+  const year = parseInt(yearFirst ? dateSegments[0] : dateSegments[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
 
   const manualDate = new Date(Date.UTC(year, month, day, hours, minutes));
   return isNaN(manualDate.getTime()) ? null : manualDate;
@@ -138,6 +168,7 @@ module.exports = {
   isSheetsSerialNumber,
   serialToDate,
   serialToMinutesOfDay,
+  parseMonthToken,
   isSameDateInTimezone,
   toMinutesOfDay,
   nowMinutesInTimezone,
