@@ -1,0 +1,31 @@
+name: NSP IG - Post Insights
+on:
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+concurrency:
+  group: nsp-ig-insights
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nsp-instagram
+    env:
+      KALENDER_SPREADSHEET_ID: ${{ vars.KALENDER_SPREADSHEET_ID }}
+      INSIGHTS_SPREADSHEET_ID: ${{ vars.INSIGHTS_SPREADSHEET_ID }}
+      DRIVE_FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
+      DOCS_MASTER_ID: ${{ vars.DOCS_MASTER_ID }}
+      NSP_IG_BUSINESS_ACCOUNT_ID: ${{ vars.NSP_IG_BUSINESS_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run post-insights
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          NSP_IG_ACCESS_TOKEN: ${{ secrets.NSP_IG_ACCESS_TOKEN }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}

@@ -1,0 +1,28 @@
+name: SP TikTok - Main Upload
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sp-tiktok
+    env:
+      KALENDER_SPREADSHEET_ID: ${{ vars.KALENDER_SPREADSHEET_ID }}
+      INSIGHTS_SPREADSHEET_ID: ${{ vars.INSIGHTS_SPREADSHEET_ID }}
+      DRIVE_FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
+      DOCS_MASTER_ID: ${{ vars.DOCS_MASTER_ID }}
+      BUFFER_CHANNEL_ID: ${{ vars.BUFFER_CHANNEL_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run main-upload
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
