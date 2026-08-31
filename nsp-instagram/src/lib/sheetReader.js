@@ -1,7 +1,7 @@
 /**
  * sheetReader.js
  * Port dari SP_SheetReader.gs (Modul 1) - baca sheet "KALENDER KONTEN",
- * balikin row-row SHOE POLICE yang siap diproses SEKARANG.
+ * balikin row-row yang siap diproses SEKARANG.
  */
 
 const { CONFIG } = require("./config");

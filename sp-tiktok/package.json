@@ -2,7 +2,7 @@
   "name": "sp-tiktok-automation",
   "version": "1.0.0",
   "private": true,
-  "description": "TikTok (Shoe Police) content automation via Buffer — migrated from Google Apps Script to Node.js / GitHub Actions.",
+  "description": "TikTok content automation via Buffer — Node.js / GitHub Actions.",
   "type": "commonjs",
   "engines": {
     "node": ">=20"

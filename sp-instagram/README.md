@@ -1,6 +1,6 @@
 # IG SP Automation (migrasi dari Apps Script ke Node.js / GitHub Actions)
 
-Ini hasil migrasi automation Instagram Shoe Police (SP) — sebelumnya 11 file
+Ini hasil migrasi automation Instagram — sebelumnya 11 file
 Apps Script (`SP_Config.gs`, `SP_SheetReader.gs`, dst) di project "Instagram
 sp Automation" — jadi Node.js yang jalan di GitHub Actions. Logikanya
 di-port 1:1, cuma cara aksesnya ke Google Sheets/Docs/Drive yang berubah
@@ -18,11 +18,10 @@ GitHub Actions.
 ## Bagian 1 — Bikin Google Cloud Service Account (dari nol)
 
 Service account itu "akun robot" yang dipakai GitHub Actions buat baca/tulis
-Sheets, Docs, dan Drive — menggantikan peran akun `igshoepolice@gmail.com`
+Sheets, Docs, dan Drive — menggantikan peran akun Google
 yang dulu otomatis "nempel" ke Apps Script.
 
-1. Buka https://console.cloud.google.com/ (login pakai akun Google apa saja,
-   boleh oqnt27@gmail.com atau igshoepolice@gmail.com).
+1. Buka https://console.cloud.google.com/ (login pakai akun Google apa saja).
 2. Bikin project baru: klik dropdown project di kiri atas > **New Project**.
    Nama bebas, misal `ig-sp-automation`. Tunggu sampai selesai dibuat, lalu
    pastikan project ini yang aktif (cek dropdown di kiri atas).
@@ -51,10 +50,10 @@ langkah 6 di atas, dengan akses **Editor**:
 
 | Resource | Link |
 |---|---|
-| Spreadsheet KALENDER KONTEN | `https://docs.google.com/spreadsheets/d/1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI` |
-| Docs Master | `https://docs.google.com/document/d/1xLigBTT0Ite4ItD5MhazsUlyFO2n98GO-xsdXNdgFq8` |
-| Folder Drive SIAP UPLOAD | `https://drive.google.com/drive/folders/1PhuAg0sJACUEr8sFbfSZEj45EGnrhF3u` |
-| Spreadsheet Shoe Police - Content Insights | `https://docs.google.com/spreadsheets/d/1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8` |
+| Spreadsheet KALENDER KONTEN | `https://docs.google.com/spreadsheets/d/<KALENDER_SPREADSHEET_ID>` |
+| Docs Master | `https://docs.google.com/document/d/<DOCS_MASTER_ID>` |
+| Folder Drive SIAP UPLOAD | `https://drive.google.com/drive/folders/<DRIVE_FOLDER_ID>` |
+| Spreadsheet Content Insights | `https://docs.google.com/spreadsheets/d/<INSIGHTS_SPREADSHEET_ID>` |
 
 Kalau lupa share salah satu, gejalanya nanti error "The caller does not
 have permission" — tinggal balik ke sini dan share resource yang kelewat.
@@ -73,7 +72,11 @@ gh repo create ig-sp-automation --private --source=. --push
 ## Bagian 4 — Isi GitHub Secrets
 
 Di repo GitHub > **Settings** > **Secrets and variables** > **Actions** >
-**New repository secret**, tambahkan 3 secret ini:
+**New repository secret**, tambahkan 3 secret ini. (ID spreadsheet/folder/akun
+disimpan terpisah sebagai **repository _Variables_** — lihat `.env.example` untuk
+daftar lengkap nama-nya.)
+
+Secret:
 
 - **`GOOGLE_SERVICE_ACCOUNT_KEY`** — buka file JSON key dari Bagian 1
   langkah 5, copy **SELURUH ISI FILE**, paste sebagai value secret ini

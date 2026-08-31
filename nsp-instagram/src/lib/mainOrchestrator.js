@@ -26,7 +26,7 @@ async function runAutomation() {
   const docs = await getDocsClient();
 
   console.log("========================================");
-  console.log("Instagram Automation (Shoe Police) - mulai jalan");
+  console.log("Instagram content automation - mulai jalan");
   console.log("========================================");
 
   try {
@@ -55,7 +55,7 @@ async function runAutomation() {
   }
 
   console.log("========================================");
-  console.log("Instagram Automation (Shoe Police) - selesai");
+  console.log("Instagram content automation - selesai");
   console.log("========================================");
 }
 

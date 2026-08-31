@@ -2,7 +2,7 @@
   "name": "ig-nsp-automation",
   "version": "1.0.0",
   "private": true,
-  "description": "Instagram (Shoe Police) content automation + insights — migrated from Google Apps Script to Node.js / GitHub Actions.",
+  "description": "Instagram content automation + insights — Node.js / GitHub Actions.",
   "type": "commonjs",
   "engines": {
     "node": ">=20"

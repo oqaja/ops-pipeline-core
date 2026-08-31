@@ -1,9 +1,11 @@
+// ID resource + template deskripsi dibaca dari environment variable (GitHub Actions
+// repo Variables / file .env lokal), tidak di-hardcode. Lihat .env.example.
 const CONFIG = {
-  KALENDER_SPREADSHEET_ID: "1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI",
+  KALENDER_SPREADSHEET_ID: getSecret("KALENDER_SPREADSHEET_ID"),
   SHEET_NAME: "KALENDER KONTEN",
 
-  DRIVE_FOLDER_ID: "1PhuAg0sJACUEr8sFbfSZEj45EGnrhF3u",
-  DOCS_MASTER_ID: "1xLigBTT0Ite4ItD5MhazsUlyFO2n98GO-xsdXNdgFq8",
+  DRIVE_FOLDER_ID: getSecret("DRIVE_FOLDER_ID"),
+  DOCS_MASTER_ID: getSecret("DOCS_MASTER_ID"),
 
   STATUS_COLUMN: "STATUS YT",
   READY_STATUS_VALUE: "Acc",
@@ -27,28 +29,11 @@ const CONFIG = {
   MAX_TITLE_LENGTH: 100,
   MAX_DESCRIPTION_LENGTH: 5000,
 
-  // Sama persis dengan channel description di affiliate-automation (channel yang sama).
-  DESCRIPTION_TEMPLATE: `Otoritas Tertinggi Tren & Edukasi Sepatu di Indonesia! 👟⚖️ Selamat datang di channel YouTube Shoe Police!
+  // Template deskripsi channel (dipakai buat tiap video). Diisi dari repo Variable
+  // CHANNEL_DESCRIPTION_TEMPLATE - sama persis dengan yang dipakai affiliate-automation.
+  DESCRIPTION_TEMPLATE: getSecret("CHANNEL_DESCRIPTION_TEMPLATE"),
 
-Banyak yang ngaku suka sepatu, tapi berapa banyak yang paham apa yang mereka pakai? Di sini, kami hadir sebagai "pengawas" sekaligus edukator di industri alas kaki. Kami nggak cuma bahas soal apa yang lagi hype, tapi kami bedah kenapa sebuah sepatu layak (atau nggak layak) masuk ke koleksi lo.
-
-Apa yang bakal lo dapetin di sini?
-- Sneaker Education: Bedah anatomi, sejarah, dan teknologi di balik sepatu favorit lo.
-- Industry Insights: Obrolan mendalam soal tren fashion, brand lokal, hingga pergerakan pasar global.
-- Legit Check & Quality Review: Kami jujur soal kualitas. Kalau bagus kami bilang mantap, kalau kurang kami laporin!
-- Community Culture: Menangkap esensi dari pergerakan komunitas (Ormas Shoe Police) dan gaya hidup di baliknya.
-
-sepatu kurasi shoepolice 👇🏻
-https://linktr.ee/Rekomendasishoepolice
-
-Di Shoe Police, kami percaya sepatu lebih dari sekadar alas kaki—ia adalah identitas.
-Follow the Movement:
-Instagram: @shoepolice__
-Tiktok: @shoepolice__
-💬 Join the Community: https://shorturl.at/EycJl
-📩 Business Inquiries: igshoepolice@gmail.com`,
-
-  INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
+  INSIGHTS_SPREADSHEET_ID: getSecret("INSIGHTS_SPREADSHEET_ID"),
   INSIGHTS_SHORTS_SHEET_NAME: "Shorts",
   INSIGHTS_LANDSCAPE_SHEET_NAME: "Landscape Videos",
   SHORTS_MAX_DURATION_SEC: 270,

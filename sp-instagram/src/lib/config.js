@@ -1,16 +1,14 @@
 /**
  * config.js
- * Port 1:1 dari SP_Config.gs. Semua value yang dulu ada di SP_CONFIG
- * tetap sama persis (ID spreadsheet, folder, dsb tidak berubah karena
- * data sumbernya tidak pindah, cuma yang mengeksekusi kode-nya yang pindah).
+ * ID resource (spreadsheet, folder Drive, akun IG) TIDAK lagi di-hardcode -
+ * dibaca dari environment variable (di-inject GitHub Actions dari repo
+ * Variables; buat testing lokal diisi lewat file .env). Lihat .env.example.
  *
- * Rahasia (token, API key) TIDAK lagi disimpan lewat PropertiesService,
- * tapi lewat environment variables (diisi dari GitHub Secrets saat
- * workflow jalan). Lihat README.md bagian "GitHub Secrets yang dibutuhkan".
+ * Token & API key juga dari environment variable (GitHub Secrets).
  */
 
 const CONFIG = {
-  KALENDER_SPREADSHEET_ID: "1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI",
+  KALENDER_SPREADSHEET_ID: getSecret("KALENDER_SPREADSHEET_ID"),
 
   SHEET_NAME: "KALENDER KONTEN",
   AKUN: "SP", // nilai kolom "AKUN" di KALENDER KONTEN buat akun ini
@@ -25,11 +23,11 @@ const CONFIG = {
 
   SUPPORTED_JENIS_KONTEN: ["Desain", "Video Pendek"],
 
-  DRIVE_FOLDER_ID: "1PhuAg0sJACUEr8sFbfSZEj45EGnrhF3u",
+  DRIVE_FOLDER_ID: getSecret("DRIVE_FOLDER_ID"),
 
-  DOCS_MASTER_ID: "1xLigBTT0Ite4ItD5MhazsUlyFO2n98GO-xsdXNdgFq8",
+  DOCS_MASTER_ID: getSecret("DOCS_MASTER_ID"),
 
-  IG_BUSINESS_ACCOUNT_ID: "17841444690537650",
+  IG_BUSINESS_ACCOUNT_ID: getSecret("SP_IG_BUSINESS_ACCOUNT_ID"),
 
   INSIGHTS_POST_SHEET_NAME: "Instagram Sp",
   INSIGHTS_ACCOUNT_SHEET_NAME: "Instagram Sp Account",
@@ -58,7 +56,7 @@ const CONFIG = {
   MAX_IMAGE_SIZE_MB: 8,
   MAX_AUDIO_BITRATE_KBPS: 128,
 
-  INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
+  INSIGHTS_SPREADSHEET_ID: getSecret("INSIGHTS_SPREADSHEET_ID"),
   MAX_INSIGHTS_PAGES: 10,
 
   // Format tampilan tanggal yang SERAGAM di semua sheet insight (IG/NSP/TikTok/YouTube).

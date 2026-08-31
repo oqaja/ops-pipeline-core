@@ -3,7 +3,7 @@ const { cekStatusUploadTiktok } = require("../src/lib/statusCheck");
 
 (async () => {
   console.log("========================================");
-  console.log("TikTok Status Check (Shoe Police, via Buffer) - mulai jalan");
+  console.log("TikTok status check (via Buffer) - mulai jalan");
   console.log("========================================");
   const clients = await getAuthClients();
   await cekStatusUploadTiktok(clients);

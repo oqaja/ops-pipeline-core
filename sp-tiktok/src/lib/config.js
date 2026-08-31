@@ -1,9 +1,11 @@
+// ID resource dibaca dari environment variable (GitHub Actions repo Variables /
+// file .env lokal), tidak di-hardcode. Lihat .env.example.
 const CONFIG = {
-  DOC_MASTER_ID: "1xLigBTT0Ite4ItD5MhazsUlyFO2n98GO-xsdXNdgFq8",
-  FOLDER_SIAP_UPLOAD_ID: "1PhuAg0sJACUEr8sFbfSZEj45EGnrhF3u",
-  SPREADSHEET_ID: "1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI",
+  DOC_MASTER_ID: getSecret("DOCS_MASTER_ID"),
+  FOLDER_SIAP_UPLOAD_ID: getSecret("DRIVE_FOLDER_ID"),
+  SPREADSHEET_ID: getSecret("KALENDER_SPREADSHEET_ID"),
   SHEET_NAME: "KALENDER KONTEN",
-  BUFFER_CHANNEL_ID: "6a86ac80ccaf649a67df85ae",
+  BUFFER_CHANNEL_ID: getSecret("BUFFER_CHANNEL_ID"),
   LABEL_LIST: [
     "tanggal upload:",
     "judul konten:",
@@ -31,7 +33,7 @@ module.exports = {
 };
 
 const TIKTOK_INSIGHT_CONFIG = {
-  INSIGHTS_SPREADSHEET_ID: "1bv0i1ZdjNg8emGRHZL4zUWt-2n6o68_ug-shuZOIWr8",
+  INSIGHTS_SPREADSHEET_ID: getSecret("INSIGHTS_SPREADSHEET_ID"),
   VIDEO_SHEET_NAME: "TikTok",
   ACCOUNT_SHEET_NAME: "TikTok Account",
   STATE_SHEET_NAME: "_State",
