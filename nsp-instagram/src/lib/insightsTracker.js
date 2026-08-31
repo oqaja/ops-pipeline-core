@@ -103,7 +103,7 @@ async function getSheetContextMap(sheets) {
   for (const row of rows) {
     const akun = String(row["AKUN"] || "").trim().toUpperCase();
     const postId = String(row[CONFIG.POST_ID_COLUMN] || "").trim();
-    if (akun === "SP" && postId !== "") {
+    if (akun === CONFIG.AKUN && postId !== "") {
       map[postId] = { judulKonten: row["JUDUL KONTEN"], jenisKonten: row["JENIS KONTEN"], tanggal: row["TANGGAL"] };
     }
   }

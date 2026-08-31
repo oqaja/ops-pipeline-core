@@ -165,7 +165,7 @@ async function validatePendingContent(sheets, drive) {
 
   for (const row of allRows) {
     const akun = String(row["AKUN"] || "").trim().toUpperCase();
-    if (akun !== "SP") continue;
+    if (akun !== CONFIG.AKUN) continue;
 
     const statusIg = String(row[CONFIG.STATUS_COLUMN] || "").trim().toUpperCase();
     if (statusIg !== CONFIG.READY_STATUS_VALUE.toUpperCase()) continue;
