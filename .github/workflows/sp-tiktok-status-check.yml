@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+concurrency:
+  group: sp-tiktok-status-check
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest

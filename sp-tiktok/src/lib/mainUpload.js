@@ -54,12 +54,25 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
 
     const nomorBaris = i + 1;
 
-        const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
+    const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
     if (!jadwalUpload) {
-      console.log(`  DEBUG baris ${nomorBaris}: tanggalCell=${JSON.stringify(tanggalCell)}, jamUpTT=${JSON.stringify(jamUpTT)}`);
-      console.log(
-        `Baris ${nomorBaris} dilewati: TANGGAL/JAM UP TT tidak valid.`
-      );
+      const pesan =
+        `TANGGAL / JAM UP TT tidak valid ` +
+        `(TANGGAL=${JSON.stringify(tanggalCell)}, JAM UP TT=${JSON.stringify(jamUpTT)}). ` +
+        `Isi jam pakai format "HH.MM" atau "HH:MM". Baris tidak di-upload sampai diperbaiki.`;
+      console.log(`Baris ${nomorBaris} dilewati: ${pesan}`);
+      try {
+        await updateCell(
+          sheets,
+          CONFIG.SPREADSHEET_ID,
+          CONFIG.SHEET_NAME,
+          nomorBaris,
+          idxCatatan,
+          `Error TikTok: ${pesan}`
+        );
+      } catch (e) {
+        console.log(`  (gagal tulis CATATAN baris ${nomorBaris}: ${e.toString()})`);
+      }
       continue;
     }
 

@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+concurrency:
+  group: sp-tiktok-main-upload
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
