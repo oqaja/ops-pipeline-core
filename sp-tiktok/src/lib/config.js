@@ -44,10 +44,12 @@ const TIKTOK_INSIGHT_CONFIG = {
   BACKFILL_DONE_KEY: "TIKTOK_BACKFILL_DONE",
 
   // Format tampilan tanggal SERAGAM lintas platform. Nilai tetap datetime asli.
-  // Butuh locale spreadsheet = id_ID supaya "mmm" render "Agu".
+  // Butuh locale spreadsheet Indonesia supaya "mmm" render "Agu" bukan "Aug".
+  // NB: Google Sheets pakai kode locale legacy "in_ID" (bukan "id_ID") - kode
+  // "id_ID" ditolak API dengan "Unsupported locale".
   POST_DATE_FORMAT: "dd mmm yyyy hh:mm",
   ACCOUNT_DATE_FORMAT: "dd mmm yyyy",
-  SPREADSHEET_LOCALE: "id_ID",
+  SPREADSHEET_LOCALE: "in_ID",
 };
 
 module.exports.TIKTOK_INSIGHT_CONFIG = TIKTOK_INSIGHT_CONFIG;

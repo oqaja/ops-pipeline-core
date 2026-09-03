@@ -363,8 +363,8 @@ async function normalizeDateColumn(sheets, spreadsheetId, sheetName, colNumber, 
   return fixed;
 }
 
-/** Pastikan locale spreadsheet = locale target (default id_ID), supaya "mmm" render "Agu" bukan "Aug". Idempoten. */
-async function ensureSpreadsheetLocale(sheets, spreadsheetId, locale = "id_ID") {
+/** Pastikan locale spreadsheet = locale target (default in_ID = Indonesia, kode legacy Google Sheets), supaya "mmm" render "Agu" bukan "Aug". Idempoten. */
+async function ensureSpreadsheetLocale(sheets, spreadsheetId, locale = "in_ID") {
   try {
     const res = await withRateLimitRetry(
       () => sheets.spreadsheets.get({ spreadsheetId, fields: "properties.locale" }),
