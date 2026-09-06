@@ -10,7 +10,8 @@
     "post-insights": "node scripts/run-post-insights.js",
     "backfill-post-insights": "node scripts/run-backfill-post-insights.js",
     "account-snapshot": "node scripts/run-account-snapshot.js",
-    "comments": "node scripts/run-comments.js"
+    "comments": "node scripts/run-comments.js",
+    "regen-token": "node scripts/regen-refresh-token.js"
   },
   "dependencies": {
     "googleapis": "^140.0.1",
