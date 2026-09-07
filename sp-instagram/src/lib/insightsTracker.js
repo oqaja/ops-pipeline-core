@@ -288,8 +288,12 @@ async function runAccountInsights(sheets) {
   const followersCount = await fetchFollowersCount(accountId, accessToken);
   const today = new Date();
 
-  const { appendRow } = require("./sheetsHelper");
-  await appendRow(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, [
+  // Bersihkan dobel warisan dulu, lalu tulis SATU baris utk hari ini (update kalau
+  // run hari ini sudah pernah jalan, mis. cron jam 4 & 9) — bukan appendRow yang
+  // bikin tanggal numpuk.
+  const { upsertRowByDate, dedupeSheetByDate } = require("./sheetsHelper");
+  await dedupeSheetByDate(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "TANGGAL");
+  await upsertRowByDate(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "TANGGAL", today, [
     today, values.reach, values.views, values.accounts_engaged, values.total_interactions, followersCount,
   ]);
 

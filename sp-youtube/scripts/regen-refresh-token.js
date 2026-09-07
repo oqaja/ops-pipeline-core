@@ -11,7 +11,9 @@
  *   2. Buka authorization URL Google OAuth di browser (scope YouTube Data + Analytics)
  *   3. Nyalain local server kecil buat nangkep redirect callback berisi "code"
  *   4. Tukar "code" jadi refresh token baru lewat token endpoint Google
- *   5. Print refresh token baru + instruksi update secret di GitHub
+ *   5. Update YT_REFRESH_TOKEN di sp-youtube/.env lokal (baris lain gak disentuh)
+ *   6. Jalanin `gh secret set` buat update secret SP_YT_REFRESH_TOKEN di GitHub
+ *   7. Print ringkasan status + fallback manual kalau ada langkah yang gagal
  *
  * Cara pakai:
  *   node scripts/regen-refresh-token.js
@@ -21,7 +23,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
+const { execFile, execFileSync } = require("child_process");
 const { google } = require("googleapis");
 
 // Harus sama persis dengan redirect URI yang terdaftar di OAuth client Google Cloud,
@@ -43,6 +45,10 @@ const SCOPES = [
 
 // Nama secret di GitHub repo (lihat .github/workflows/sp-yt-*.yml).
 const GITHUB_SECRET_NAME = "SP_YT_REFRESH_TOKEN";
+const GITHUB_REPO = "oqaja/ops-pipeline-core";
+
+// Nama env var refresh token di sp-youtube/.env.
+const ENV_REFRESH_KEY = "YT_REFRESH_TOKEN";
 
 function loadEnvFile(envPath) {
   if (!fs.existsSync(envPath)) {
@@ -62,6 +68,52 @@ function loadEnvFile(envPath) {
     out[key] = val;
   }
   return out;
+}
+
+/**
+ * Update satu key di file .env — replace nilainya kalau barisnya ada, atau
+ * append di akhir file kalau belum ada. Baris lain TIDAK disentuh sama sekali
+ * (komentar, whitespace, urutan, quoting semua dipertahankan apa adanya).
+ * Throw kalau file gak ketemu atau gagal ditulis.
+ */
+function upsertEnvVar(envPath, key, value) {
+  if (!fs.existsSync(envPath)) {
+    throw new Error(`File .env tidak ditemukan di: ${envPath}`);
+  }
+  const original = fs.readFileSync(envPath, "utf8");
+  const lines = original.split("\n");
+  const keyRe = new RegExp(`^\\s*${key}\\s*=`);
+
+  let replaced = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (keyRe.test(lines[i])) {
+      lines[i] = `${key}=${value}`;
+      replaced = true;
+      break;
+    }
+  }
+
+  if (!replaced) {
+    // Sisipin sebelum trailing newline kalau ada, biar gak nambah baris kosong.
+    if (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines.splice(lines.length - 1, 0, `${key}=${value}`);
+    } else {
+      lines.push(`${key}=${value}`);
+    }
+  }
+
+  fs.writeFileSync(envPath, lines.join("\n"));
+  return replaced ? "replaced" : "appended";
+}
+
+/**
+ * Set GitHub Actions secret lewat `gh` CLI. Pakai execFileSync (bukan shell)
+ * biar token gak kena parsing shell. Throw kalau gh gagal / gak ke-install.
+ */
+function setGithubSecret(name, repo, token) {
+  execFileSync("gh", ["secret", "set", name, "--repo", repo, "--body", token], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
 
 function openInBrowser(url) {
@@ -138,28 +190,70 @@ function waitForCode(oauth2Client) {
     );
   }
 
+  const refreshToken = tokens.refresh_token;
   const expiryNote = tokens.expiry_date
     ? ` (access token berlaku s/d ${new Date(tokens.expiry_date).toLocaleString("id-ID")})`
     : "";
 
+  // Print token DULU sebelum apa-apa — apa pun yang gagal setelah ini, token
+  // tetep kelihatan di terminal dan gak ilang.
   console.log("\n" + "=".repeat(72));
   console.log("REFRESH TOKEN BARU" + expiryNote + ":\n");
-  console.log(tokens.refresh_token);
+  console.log(refreshToken);
+  console.log("\n" + "=".repeat(72) + "\n");
+
+  // --- 1. Update .env lokal ---
+  let envOk = false;
+  let envErr = null;
+  try {
+    const how = upsertEnvVar(envPath, ENV_REFRESH_KEY, refreshToken);
+    envOk = true;
+    console.log(
+      how === "replaced"
+        ? `[.env]  ${ENV_REFRESH_KEY} di ${envPath} di-replace dengan token baru.`
+        : `[.env]  ${ENV_REFRESH_KEY} belum ada — ditambahkan di akhir ${envPath}.`
+    );
+  } catch (e) {
+    envErr = e;
+    console.error(`[.env]  GAGAL update ${envPath}:`);
+    console.error(`        ${e.message || e}`);
+    console.error(`        -> Update manual: set baris  ${ENV_REFRESH_KEY}=<token di atas>`);
+  }
+
+  // --- 2. Update GitHub secret via gh CLI ---
+  let secretOk = false;
+  let secretErr = null;
+  try {
+    setGithubSecret(GITHUB_SECRET_NAME, GITHUB_REPO, refreshToken);
+    secretOk = true;
+    console.log(`[gh]    Secret ${GITHUB_SECRET_NAME} di ${GITHUB_REPO} berhasil di-set.`);
+  } catch (e) {
+    secretErr = e;
+    const detail =
+      (e.stderr && e.stderr.toString().trim()) ||
+      (e.code === "ENOENT" ? "gh CLI tidak ke-install / tidak ada di PATH" : e.message || String(e));
+    console.error(`[gh]    GAGAL set secret via gh CLI:`);
+    console.error(`        ${detail}`);
+    console.error(`        Kemungkinan: gh belum ke-install, atau belum login (\`gh auth login\`).`);
+    console.error(`        -> Jalanin manual:`);
+    console.error(
+      `           gh secret set ${GITHUB_SECRET_NAME} --repo ${GITHUB_REPO} --body '<token di atas>'`
+    );
+    console.error(`        atau lewat web: Settings > Secrets and variables > Actions > ${GITHUB_SECRET_NAME}`);
+  }
+
+  // --- Ringkasan ---
   console.log("\n" + "=".repeat(72));
-  console.log(`
-Update secret di GitHub — salah satu cara:
+  console.log("RINGKASAN:");
+  console.log(`  ${envOk ? "✅" : "❌"} .env ${envOk ? "ke-update" : "GAGAL — update manual (token di atas)"}`);
+  console.log(
+    `  ${secretOk ? "✅" : "❌"} Secret GitHub ${secretOk ? "ke-update" : "GAGAL — jalanin command gh manual di atas"}`
+  );
+  console.log("\nCatatan: token OAuth app status \"Testing\" expired lagi dalam ~7 hari —");
+  console.log("set reminder generate ulang tiap ~6 hari (`npm run regen-token`).");
+  console.log("=".repeat(72) + "\n");
 
-  A. Via CLI (butuh gh + akses repo):
-     gh secret set ${GITHUB_SECRET_NAME} --repo <owner>/<repo> --body "<token di atas>"
-
-  B. Via web:
-     Settings > Secrets and variables > Actions > ${GITHUB_SECRET_NAME} > Update
-
-Catatan:
-  - Token dari OAuth app status "Testing" bakal expired lagi dalam ~7 hari.
-    Set reminder generate ulang tiap ~6 hari.
-  - Update juga YT_REFRESH_TOKEN di ${envPath} kalau dipakai buat run lokal.
-`);
+  if (!envOk || !secretOk) process.exit(1);
 })().catch((e) => {
   console.error("\nFATAL ERROR:", e.message || e);
   process.exit(1);

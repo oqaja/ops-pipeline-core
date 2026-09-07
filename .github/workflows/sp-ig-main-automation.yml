@@ -1,7 +1,7 @@
 name: SP IG - Main Automation
 on:
   repository_dispatch:
-    types: [run-main-automation]
+    types: [run-main-automation, content-acc-ig-sp]
   workflow_dispatch:
 concurrency:
   group: sp-ig-main-automation

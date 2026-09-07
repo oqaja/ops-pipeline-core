@@ -6,6 +6,7 @@
 
 const { CONFIG, getDriveApiKey } = require("./config");
 const { checkAudioBitrate } = require("./videoValidator");
+const { normalizeTitleForMatch } = require("./titleMatch");
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -73,7 +74,7 @@ function getSafeDriveUrl(fileId) {
 
 /** Setara spFindContentFiles(). */
 async function findContentFiles(drive, judulKonten) {
-  const targetName = String(judulKonten || "").trim().toLowerCase();
+  const targetName = normalizeTitleForMatch(judulKonten);
   if (!targetName) return [];
 
   const files = await listFolderFiles(drive);
@@ -83,8 +84,7 @@ async function findContentFiles(drive, judulKonten) {
   const numberedPattern = new RegExp(`^${escapeRegex(targetName)}[\\s\\-_]+(\\d+)$`, "i");
 
   for (const file of files) {
-    const nameWithoutExt = stripExtension(file.name).trim();
-    const nameLower = nameWithoutExt.toLowerCase();
+    const nameLower = normalizeTitleForMatch(stripExtension(file.name));
 
     if (nameLower === targetName) {
       exactMatch = file;
@@ -118,14 +118,14 @@ async function findContentFile(drive, judulKonten) {
 
 /** Setara spFindCoverFile(). */
 async function findCoverFile(drive, judulKonten) {
-  const targetName = String(judulKonten || "").trim().toLowerCase();
+  const targetName = normalizeTitleForMatch(judulKonten);
   if (!targetName) return null;
 
-  const coverName = `${targetName} ${CONFIG.COVER_FILE_SUFFIX.toLowerCase()}`;
+  const coverName = normalizeTitleForMatch(`${targetName} ${CONFIG.COVER_FILE_SUFFIX}`);
   const files = await listFolderFiles(drive);
 
   for (const file of files) {
-    const nameWithoutExt = stripExtension(file.name).trim().toLowerCase();
+    const nameWithoutExt = normalizeTitleForMatch(stripExtension(file.name));
     if (nameWithoutExt === coverName) {
       const mimeType = file.mimeType || "";
       if (mimeType.indexOf("image/") !== 0) {
