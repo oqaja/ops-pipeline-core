@@ -2,9 +2,6 @@ const { CONFIG } = require("./config");
 const { readSheetAsObjects } = require("./sheetsHelper");
 
 function isReadyToPost(row) {
-  const akun = String(row[CONFIG.AKUN_COLUMN] || "").trim().toUpperCase();
-  if (akun !== "SP") return false;
-
   const jenisKonten = String(row[CONFIG.JENIS_KONTEN_COLUMN] || "").trim();
   if (jenisKonten.toLowerCase() !== CONFIG.SUPPORTED_JENIS_KONTEN.toLowerCase()) return false;
 
@@ -30,10 +27,7 @@ async function getReadyRows(sheets) {
 
 async function getUploadedRows(sheets) {
   const { rows } = await readSheetAsObjects(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME);
-  return rows.filter((row) => {
-    const akun = String(row[CONFIG.AKUN_COLUMN] || "").trim().toUpperCase();
-    return akun === "SP" && String(row[CONFIG.POST_ID_COLUMN] || "").trim() !== "";
-  });
+  return rows.filter((row) => String(row[CONFIG.POST_ID_COLUMN] || "").trim() !== "");
 }
 
 module.exports = { getReadyRows, getUploadedRows, isReadyToPost };
