@@ -1,7 +1,7 @@
 name: NSP IG - Main Automation
 on:
   repository_dispatch:
-    types: [run-nsp-main-automation]
+    types: [run-nsp-main-automation, content-acc-ig-nsp]
   workflow_dispatch:
 concurrency:
   group: nsp-ig-main-automation

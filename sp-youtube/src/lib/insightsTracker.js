@@ -2,7 +2,7 @@ const { CONFIG } = require("./config");
 const {
   ensureSheetWithHeaders, upsertRowByKey, appendRow, sortByColumnDesc, getHeaderColumnMap,
   readSheetAsObjects, deleteRowsByNumbers, dedupeSheetByKey, applyColumnDateFormat,
-  normalizeDateColumn, ensureSpreadsheetLocale,
+  normalizeDateColumn, ensureSpreadsheetLocale, upsertRowByDate, dedupeSheetByDate,
 } = require("./sheetsHelper");
 const { getState, setState, deleteState, reportBackfillDone } = require("./stateStore");
 const { parseFlexibleDate, toSheetDateString } = require("./dateUtils");
@@ -261,7 +261,11 @@ async function runAccountSnapshot({ sheets, youtube }) {
   await ensureSheetWithHeaders(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, ACCOUNT_INSIGHT_HEADERS);
 
   const stats = await getChannelStatistics(youtube);
-  await appendRow(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, [
+
+  // Bersihkan dobel warisan dulu, lalu tulis SATU baris utk hari ini (update kalau
+  // run hari ini sudah pernah jalan) — bukan appendRow yang bikin tanggal numpuk.
+  await dedupeSheetByDate(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "Tanggal");
+  await upsertRowByDate(sheets, CONFIG.INSIGHTS_SPREADSHEET_ID, CONFIG.INSIGHTS_ACCOUNT_SHEET_NAME, "Tanggal", new Date(), [
     new Date(),
     stats.title,
     stats.subscriberCount,

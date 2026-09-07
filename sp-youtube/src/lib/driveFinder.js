@@ -1,4 +1,5 @@
 const { CONFIG } = require("./config");
+const { normalizeTitleForMatch } = require("./titleMatch");
 
 async function listFilesInFolder(drive) {
   const files = [];
@@ -22,8 +23,8 @@ function stripExtension(name) {
 
 async function cariFileVideo(drive, namaFile) {
   const files = await listFilesInFolder(drive);
-  const target = namaFile.trim().toLowerCase();
-  return files.find((f) => stripExtension(f.name).trim().toLowerCase() === target) || null;
+  const target = normalizeTitleForMatch(namaFile);
+  return files.find((f) => normalizeTitleForMatch(stripExtension(f.name)) === target) || null;
 }
 
 async function downloadFileStream(drive, fileId) {

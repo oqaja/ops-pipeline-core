@@ -1,10 +1,14 @@
 name: SP TikTok - Account Snapshot
 on:
   schedule:
-    - cron: '0 13 * * *'
+    # 2x sehari (06:00 & 18:00 UTC) — kalau satu run di-drop GitHub, run lain masih
+    # nutup hari itu. Idempoten: nulis 1 baris per hari, run kedua cuma me-refresh.
+    - cron: '0 6,18 * * *'
   workflow_dispatch:
 concurrency:
-  group: sp-tiktok-insights
+  # Grup sendiri — jangan sampai ke-antri di belakang post-insights (yang cron-nya
+  # juga 0 13) lalu ke-cancel waktu run terjadwal berikutnya masuk grup.
+  group: sp-tiktok-account
   cancel-in-progress: false
 jobs:
   run:

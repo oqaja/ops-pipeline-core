@@ -6,7 +6,6 @@ const {
   cariFileVideo,
   cariFileFotoCarousel,
   getDriveDirectLink,
-  getResizedImageUrl,
 } = require("./driveFinder");
 const { kirimCreatePostKeBuffer } = require("./bufferClient");
 
@@ -102,7 +101,7 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
         }
         assetsGraphQL = fotoFiles
           .map((file) => {
-            const url = getResizedImageUrl(file);
+            const url = getDriveDirectLink(file);
             return `{ image: { url: ${JSON.stringify(url)} } }`;
           })
           .join(",\n");

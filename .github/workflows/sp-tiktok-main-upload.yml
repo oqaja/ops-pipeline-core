@@ -2,6 +2,8 @@ name: SP TikTok - Main Upload
 on:
   schedule:
     - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [content-acc-tt]
   workflow_dispatch:
 jobs:
   run:

@@ -1,4 +1,5 @@
 const { CONFIG, getDriveApiKey } = require("./config");
+const { normalizeTitleForMatch } = require("./titleMatch");
 
 async function listFilesInFolder(drive) {
   const files = [];
@@ -22,18 +23,18 @@ function stripExtension(name) {
 
 async function cariFileVideo(drive, namaFile) {
   const files = await listFilesInFolder(drive);
-  const target = namaFile.trim().toLowerCase();
-  return files.find((f) => stripExtension(f.name).trim().toLowerCase() === target) || null;
+  const target = normalizeTitleForMatch(namaFile);
+  return files.find((f) => normalizeTitleForMatch(stripExtension(f.name)) === target) || null;
 }
 
 async function cariFileFotoCarousel(drive, namaFileDasar) {
   const files = await listFilesInFolder(drive);
-  const namaEscaped = namaFileDasar.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp("^" + namaEscaped + "\\s*(\\d+)$", "i");
+  const namaEscaped = normalizeTitleForMatch(namaFileDasar).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp("^" + namaEscaped + "\\s*(\\d+)$");
 
   const hasil = [];
   for (const f of files) {
-    const namaTanpaEkstensi = stripExtension(f.name).trim();
+    const namaTanpaEkstensi = normalizeTitleForMatch(stripExtension(f.name));
     const match = namaTanpaEkstensi.match(regex);
     if (match) {
       if (f.mimeType.indexOf("image/") !== 0) continue;
@@ -52,8 +53,4 @@ function getDriveDirectLink(file) {
   return `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${apiKey}`;
 }
 
-function getResizedImageUrl(file) {
-  return `https://drive.google.com/thumbnail?id=${file.id}&sz=w1080-h1920`;
-}
-
-module.exports = { cariFileVideo, cariFileFotoCarousel, getDriveDirectLink, getResizedImageUrl };
+module.exports = { cariFileVideo, cariFileFotoCarousel, getDriveDirectLink };

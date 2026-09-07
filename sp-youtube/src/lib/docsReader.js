@@ -1,4 +1,5 @@
 const { CONFIG } = require("./config");
+const { normalizeTitleForMatch } = require("./titleMatch");
 
 const LABEL_LIST = [
   "tanggal upload:",
@@ -75,7 +76,7 @@ function telusuriTabCariJudul(tabs, judulDicari) {
     const blocks = parseSemuaKontenDalamTab(teks);
 
     for (const b of blocks) {
-      if (b.judulKonten.trim().toLowerCase() === judulDicari.trim().toLowerCase()) {
+      if (normalizeTitleForMatch(b.judulKonten) === normalizeTitleForMatch(judulDicari)) {
         return b;
       }
     }

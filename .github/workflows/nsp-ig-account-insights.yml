@@ -4,7 +4,9 @@ on:
     - cron: '0 4,9 * * *'
   workflow_dispatch:
 concurrency:
-  group: nsp-ig-insights
+  # Grup sendiri (bukan nsp-ig-insights) — snapshot akun nyentuh tab "* Account", beda
+  # dari post-insights/backfill, jadi gak perlu antri di belakang mereka.
+  group: nsp-ig-account
   cancel-in-progress: false
 jobs:
   run:

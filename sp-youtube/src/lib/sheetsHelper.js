@@ -390,9 +390,114 @@ async function sortByColumnDesc(sheets, spreadsheetId, sheetName, columnName) {
   );
 }
 
+// --- Snapshot harian: 1 baris per hari kalender (WIB), anti-dobel & self-healing ---
+// Dipakai tab "YouTube Account". Sebelumnya pakai appendRow polos -> tiap re-run /
+// retry / cron dobel nambah baris baru, jadi ada tanggal yang numpuk.
+
+const WIB_SHEETS_EPOCH_UTC_MS = Date.UTC(1899, 11, 30);
+const WIB_MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * "YYYY-MM-DD" (hari kalender WIB) dari sebuah nilai sel tanggal. Menerima serial
+ * number Sheets (hasil readSheetAsObjects), objek Date, string ISO "YYYY-MM-DD...",
+ * atau "dd/mm/yyyy". Balikin null kalau tak terbaca.
+ */
+function toWibDayKey(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number" && !isNaN(value)) {
+    const d = new Date(WIB_SHEETS_EPOCH_UTC_MS + value * WIB_MS_PER_DAY);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : toSheetDateString(value).slice(0, 10);
+  }
+  const s = String(value).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
+/**
+ * Upsert 1 baris per HARI KALENDER (WIB): cocokkan baris lewat hari-kalender kolom
+ * `dateColumnName` (bukan string persis), jadi run kedua di hari yang sama meng-update
+ * baris yang sama, bukan nambah baris baru. Kalau hari itu terlanjur dobel, sisakan
+ * satu, hapus sisanya.
+ * @return {number} nomor baris yang ditulis
+ */
+async function upsertRowByDate(sheets, spreadsheetId, sheetName, dateColumnName, dateValue, rowData) {
+  const headerMap = await getHeaderColumnMap(sheets, spreadsheetId, sheetName);
+  if (!headerMap[dateColumnName]) {
+    throw new Error(`Kolom '${dateColumnName}' tidak ketemu di sheet '${sheetName}'.`);
+  }
+
+  const targetKey = toWibDayKey(dateValue);
+  const { rows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
+  const matches = targetKey ? rows.filter((r) => toWibDayKey(r[dateColumnName]) === targetKey) : [];
+
+  if (matches.length > 0) {
+    const first = matches[0];
+    await setRowValues(sheets, spreadsheetId, sheetName, first._rowNumber, rowData);
+    if (matches.length > 1) {
+      await deleteRowsByNumbers(sheets, spreadsheetId, sheetName, matches.slice(1).map((r) => r._rowNumber));
+      console.log(`  (dedupe tanggal) ${sheetName}: ${matches.length - 1} baris dobel utk ${targetKey} dihapus.`);
+    }
+    return first._rowNumber;
+  }
+
+  await appendRow(sheets, spreadsheetId, sheetName, rowData);
+  const { rows: afterRows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
+  return afterRows.length + 1;
+}
+
+/**
+ * Self-healing: untuk tiap hari-kalender yang punya >1 baris, sisakan SATU (yang sel
+ * non-kosongnya terbanyak; tiebreak: timestamp lalu baris terbawah), hapus sisanya.
+ * Return jumlah baris yang dihapus.
+ */
+async function dedupeSheetByDate(sheets, spreadsheetId, sheetName, dateColumnName) {
+  const { headers, rows } = await readSheetAsObjects(sheets, spreadsheetId, sheetName);
+  if (rows.length < 2) return 0;
+
+  const groups = new Map();
+  for (const row of rows) {
+    const key = toWibDayKey(row[dateColumnName]);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  const score = (r) => {
+    const filled = headers.reduce(
+      (n, h) => n + (r[h] !== "" && r[h] !== null && r[h] !== undefined ? 1 : 0),
+      0
+    );
+    const serial = typeof r[dateColumnName] === "number" ? r[dateColumnName] : 0;
+    return [filled, serial, r._rowNumber];
+  };
+  const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+  const toDelete = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    let keep = group[0];
+    for (const r of group) if (cmp(score(r), score(keep)) > 0) keep = r;
+    for (const r of group) if (r._rowNumber !== keep._rowNumber) toDelete.push(r._rowNumber);
+  }
+
+  if (toDelete.length === 0) return 0;
+  await deleteRowsByNumbers(sheets, spreadsheetId, sheetName, toDelete);
+  console.log(`  (dedupe tanggal) ${sheetName}: ${toDelete.length} baris dobel-hari dibersihkan.`);
+  return toDelete.length;
+}
+
 module.exports = {
   readSheetAsObjects,
   getHeaderColumnMap,
+  toWibDayKey,
+  upsertRowByDate,
+  dedupeSheetByDate,
   setCellValue,
   setRowValues,
   appendRow,

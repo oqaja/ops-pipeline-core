@@ -2,6 +2,8 @@ name: SP YouTube - Main Upload
 on:
   schedule:
     - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [content-acc-yt]
   workflow_dispatch:
 concurrency:
   group: sp-yt-main-upload

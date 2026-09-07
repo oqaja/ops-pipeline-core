@@ -105,12 +105,15 @@ async function processSingleRow(sheets, drive, docs, row) {
     return;
   }
 
-  if (caption === null) {
-    console.log("Caption tidak ketemu di Docs Master - lanjut publish TANPA caption.");
-    caption = "";
-  } else {
-    console.log(`Caption ketemu (${caption.length} karakter).`);
+  if (caption === null || caption.trim() === "") {
+    await handleFailure(
+      sheets,
+      rowNumber,
+      `Caption belum ada di Docs Master untuk '${judul}' (blok 'Caption + Hashtag:' kosong / tidak ketemu) - tidak di-upload.`
+    );
+    return;
   }
+  console.log(`Caption ketemu (${caption.length} karakter).`);
 
   let collaborators = [];
   try {

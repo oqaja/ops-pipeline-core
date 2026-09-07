@@ -10,6 +10,7 @@
  */
 
 const { CONFIG } = require("./config");
+const { normalizeTitleForMatch } = require("./titleMatch");
 
 const DOC_LABELS = [
   "Tanggal Upload:",
@@ -85,7 +86,7 @@ function findMatchingBlockIndex(lines, targetJudul) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (lineStartsWithLabel(line, "Judul Konten:")) {
-      const judulValue = getLabelValue(line, "Judul Konten:").trim().toLowerCase();
+      const judulValue = normalizeTitleForMatch(getLabelValue(line, "Judul Konten:"));
       if (judulValue === targetJudul) return i;
     }
   }
@@ -177,7 +178,7 @@ function clearDocsCache() {
 
 /** Setara spGetCaptionFromDocs(). */
 async function getCaptionFromDocs(docs, judulKonten) {
-  const targetJudul = String(judulKonten || "").trim().toLowerCase();
+  const targetJudul = normalizeTitleForMatch(judulKonten);
   if (!targetJudul) return null;
 
   const tabs = await getDocTabsAsLines(docs);
@@ -194,7 +195,7 @@ async function getCaptionFromDocs(docs, judulKonten) {
 
 /** Setara spGetCollaboratorsFromDocs(). */
 async function getCollaboratorsFromDocs(docs, judulKonten) {
-  const targetJudul = String(judulKonten || "").trim().toLowerCase();
+  const targetJudul = normalizeTitleForMatch(judulKonten);
   if (!targetJudul) return [];
 
   const tabs = await getDocTabsAsLines(docs);

@@ -1,7 +1,7 @@
 const { TIKTOK_INSIGHT_CONFIG } = require("./config");
 const { getValidTikTokToken } = require("./tiktokAuth");
 const {
-  ensureSheetWithHeaders, appendRow, sortByColumnDesc, getHeaderColumnMap, applyColumnDateFormat,
+  ensureSheetWithHeaders, upsertRowByDate, dedupeSheetByDate, sortByColumnDesc, getHeaderColumnMap, applyColumnDateFormat,
 } = require("./sheetsHelper");
 
 const CFG = TIKTOK_INSIGHT_CONFIG;
@@ -29,7 +29,10 @@ async function pullTikTokAccountSnapshot({ sheets }) {
 
   await ensureSheetWithHeaders(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, headers);
 
-  await appendRow(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, [
+  // Bersihkan dobel warisan dulu, lalu tulis SATU baris utk hari ini (update kalau
+  // run hari ini sudah pernah jalan) — bukan appendRow yang bikin tanggal numpuk.
+  await dedupeSheetByDate(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, "Tanggal");
+  await upsertRowByDate(sheets, CFG.INSIGHTS_SPREADSHEET_ID, CFG.ACCOUNT_SHEET_NAME, "Tanggal", new Date(), [
     new Date(),
     user.display_name || "",
     user.follower_count || 0,
