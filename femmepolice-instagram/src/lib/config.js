@@ -11,7 +11,7 @@ const CONFIG = {
   KALENDER_SPREADSHEET_ID: getSecret("KALENDER_SPREADSHEET_ID"),
 
   SHEET_NAME: "KALENDER KONTEN",
-  AKUN: "FEMMEPOLICE", // nilai kolom "AKUN" di KALENDER KONTEN buat akun ini
+  AKUN: "FP", // nilai kolom "AKUN" di KALENDER KONTEN buat akun ini
   STATUS_COLUMN: "STATUS IG",
   READY_STATUS_VALUE: "Acc",
   SCHEDULED_STATUS_VALUE: "Scheduled",
