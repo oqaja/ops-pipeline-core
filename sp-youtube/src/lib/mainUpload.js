@@ -20,6 +20,7 @@ function sheetStatusFor(privacyStatus) {
 async function processNewUpload(row, headerMap, { sheets, docs, drive, youtube }) {
   const nomorBaris = row._rowNumber;
   const judul = String(row[CONFIG.JUDUL_COLUMN] || "").trim();
+  const segmen = String(row[CONFIG.SEGMEN_COLUMN] || "").trim();
   const tanggalCell = row[CONFIG.TANGGAL_COLUMN];
   const jamCell = row[CONFIG.JAM_COLUMN];
 
@@ -39,7 +40,7 @@ async function processNewUpload(row, headerMap, { sheets, docs, drive, youtube }
     const kontenDitemukan = await cariKontenDiDocsMaster(docs, judul);
     const deskripsiUser = kontenDitemukan && kontenDitemukan.deskripsiYoutube ? kontenDitemukan.deskripsiYoutube.trim() : "";
 
-    const title = buildTitle(judul);
+    const title = buildTitle(judul, segmen);
     const description = buildDescription(deskripsiUser);
     const { privacyStatus, publishAt } = determinePrivacyAndSchedule(jadwalUpload);
     const statusToWrite = sheetStatusFor(privacyStatus);

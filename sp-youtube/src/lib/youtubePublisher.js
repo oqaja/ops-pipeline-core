@@ -1,8 +1,9 @@
 const { CONFIG } = require("./config");
 
-/** Judul di-UPPERCASE-kan (beda dari affiliate yang lowercase) + suffix #Shorts. */
-function buildTitle(judulKonten) {
-  let title = judulKonten.trim().toUpperCase();
+/** Judul di-UPPERCASE-kan by default, KECUALI SEGMEN = "Cutting" (lowercase) + suffix #Shorts. */
+function buildTitle(judulKonten, segmen) {
+  const isCutting = String(segmen || "").trim().toLowerCase() === "cutting";
+  let title = isCutting ? judulKonten.trim().toLowerCase() : judulKonten.trim().toUpperCase();
   const suffix = " #Shorts";
   const maxBaseLength = CONFIG.MAX_TITLE_LENGTH - suffix.length;
   if (title.length > maxBaseLength) {
