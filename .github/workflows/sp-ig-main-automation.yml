@@ -3,6 +3,8 @@ on:
   repository_dispatch:
     types: [run-main-automation, content-acc-ig-sp]
   workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
 concurrency:
   group: sp-ig-main-automation
   cancel-in-progress: false

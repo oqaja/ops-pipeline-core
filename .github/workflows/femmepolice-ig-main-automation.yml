@@ -1,8 +1,10 @@
 name: Femmepolice IG - Main Automation
 on:
   repository_dispatch:
-    types: [run-femmepolice-main-automation, content-acc-ig-femmepolice]
+    types: [run-fp-main-automation, content-acc-ig-fp]
   workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
 concurrency:
   group: femmepolice-ig-main-automation
   cancel-in-progress: false
