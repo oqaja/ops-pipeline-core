@@ -5,6 +5,9 @@ on:
   repository_dispatch:
     types: [content-acc-tt]
   workflow_dispatch:
+concurrency:
+  group: sp-tiktok-main-upload
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
