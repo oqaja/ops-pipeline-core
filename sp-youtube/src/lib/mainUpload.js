@@ -11,6 +11,7 @@ const {
   uploadVideo,
   updateVideoSchedule,
   getVideoStatus,
+  updateVideoDetails,
 } = require("./youtubePublisher");
 
 function sheetStatusFor(privacyStatus) {
@@ -67,9 +68,11 @@ async function processNewUpload(row, headerMap, { sheets, docs, drive, youtube }
   }
 }
 
-async function processReschedule(row, headerMap, { sheets, youtube }) {
+async function processReschedule(row, headerMap, { sheets, docs, youtube }) {
   const nomorBaris = row._rowNumber;
   const videoId = String(row[CONFIG.POST_ID_COLUMN] || "").trim();
+  const judul = String(row[CONFIG.JUDUL_COLUMN] || "").trim();
+  const segmen = String(row[CONFIG.SEGMEN_COLUMN] || "").trim();
   const tanggalCell = row[CONFIG.TANGGAL_COLUMN];
   const jamCell = row[CONFIG.JAM_COLUMN];
 
@@ -86,12 +89,12 @@ async function processReschedule(row, headerMap, { sheets, youtube }) {
     const { privacyStatus: expectedPrivacy, publishAt: expectedPublishAt } = determinePrivacyAndSchedule(jadwalUpload);
     const expectedSheetStatus = sheetStatusFor(expectedPrivacy);
 
-    const currentPublishAtMs = currentStatus.publishAt ? new Date(currentStatus.publishAt).getTime() : null;
+    const currentPublishAtMs = currentStatus.status.publishAt ? new Date(currentStatus.status.publishAt).getTime() : null;
     const expectedPublishAtMs = expectedPublishAt ? new Date(expectedPublishAt).getTime() : null;
-    const needsYoutubeUpdate = currentStatus.privacyStatus !== expectedPrivacy || currentPublishAtMs !== expectedPublishAtMs;
+    const needsYoutubeUpdate = currentStatus.status.privacyStatus !== expectedPrivacy || currentPublishAtMs !== expectedPublishAtMs;
 
     if (needsYoutubeUpdate) {
-      console.log(`  Reschedule baris ${nomorBaris} (${videoId}): ${currentStatus.privacyStatus} -> ${expectedPrivacy}`);
+      console.log(`  Reschedule baris ${nomorBaris} (${videoId}): ${currentStatus.status.privacyStatus} -> ${expectedPrivacy}`);
       await updateVideoSchedule(youtube, videoId, jadwalUpload);
       await setCellValue(
         sheets,
@@ -100,6 +103,30 @@ async function processReschedule(row, headerMap, { sheets, youtube }) {
         nomorBaris,
         headerMap[CONFIG.CATATAN_COLUMN],
         `Reschedule ke ${expectedPrivacy}${expectedPublishAt ? `, publish ${jadwalUpload.toLocaleString("id-ID")}` : ""}.`
+      );
+    }
+
+    const kontenDitemukan = await cariKontenDiDocsMaster(docs, judul);
+    const deskripsiUser = kontenDitemukan && kontenDitemukan.deskripsiYoutube ? kontenDitemukan.deskripsiYoutube.trim() : "";
+    const expectedTitle = buildTitle(judul, segmen);
+    const expectedDescription = buildDescription(deskripsiUser);
+
+    const needsDetailUpdate =
+      expectedTitle !== currentStatus.snippet.title || expectedDescription !== currentStatus.snippet.description;
+
+    if (needsDetailUpdate) {
+      console.log(`  Update title/description baris ${nomorBaris} (${videoId}) karena berubah di sheet/Docs.`);
+      await updateVideoDetails(youtube, videoId, currentStatus.snippet, {
+        title: expectedTitle,
+        description: expectedDescription,
+      });
+      await setCellValue(
+        sheets,
+        CONFIG.KALENDER_SPREADSHEET_ID,
+        CONFIG.SHEET_NAME,
+        nomorBaris,
+        headerMap[CONFIG.CATATAN_COLUMN],
+        `Update title/description karena berubah di sheet/Docs.`
       );
     }
 
@@ -121,7 +148,7 @@ async function runMainUpload({ sheets, docs, drive, youtube }) {
   const uploadedRows = await getUploadedRows(sheets);
   console.log(`${uploadedRows.length} row sudah pernah upload - cek apakah ada reschedule.`);
   for (const row of uploadedRows) {
-    await processReschedule(row, headerMap, { sheets, youtube });
+    await processReschedule(row, headerMap, { sheets, docs, youtube });
   }
 
   console.log("Selesai proses Main Upload.");

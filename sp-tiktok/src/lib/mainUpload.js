@@ -7,7 +7,7 @@ const {
   cariFileFotoCarousel,
   getDriveDirectLink,
 } = require("./driveFinder");
-const { kirimCreatePostKeBuffer } = require("./bufferClient");
+const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer } = require("./bufferClient");
 
 async function jalankanUploadTiktok({ sheets, docs, drive }) {
   const data = await getRawGrid(
@@ -176,10 +176,132 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
     }
   }
 
+  let diupdate = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const judulSheet = row[idxJudul];
+    const jenisKontenRaw = row[idxJenisKonten];
+    const jenisKonten = jenisKontenRaw
+      ? jenisKontenRaw.toString().toLowerCase().trim()
+      : "";
+    const statusTT = row[idxStatusTT];
+    const postIdTT = row[idxPostIdTT];
+    const tanggalCell = row[idxTanggal];
+    const jamUpTT = row[idxJamUpTT];
+
+    const isVideo = jenisKonten === "video pendek";
+    const isCarousel = jenisKonten === "desain";
+    const jenisSesuai = isVideo || isCarousel;
+
+    const statusScheduled =
+      statusTT && statusTT.toString().toLowerCase().trim() === "scheduled";
+    const adaPostId = postIdTT && postIdTT.toString().trim() !== "";
+
+    if (!(jenisSesuai && statusScheduled && adaPostId)) continue;
+
+    const nomorBaris = i + 1;
+
+    const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
+    if (!jadwalUpload) {
+      console.log(
+        `Baris ${nomorBaris} dilewati (update): TANGGAL/JAM UP TT tidak valid.`
+      );
+      continue;
+    }
+
+    console.log(
+      `Proses update TikTok baris ${nomorBaris} [${isVideo ? "video" : "carousel"}]: ${judulSheet}`
+    );
+
+    try {
+      const kontenDitemukan = await cariKontenDiDocsMaster(docs, judulSheet);
+      const captionUntukTiktok =
+        kontenDitemukan && kontenDitemukan.captionHashtag
+          ? kontenDitemukan.captionHashtag.trim()
+          : "";
+
+      if (!captionUntukTiktok) {
+        throw new Error(
+          `Caption kosong di Docs Master untuk judul: ${judulSheet}.`
+        );
+      }
+
+      const dueAtIso = jadwalUpload.toISOString();
+      let assetsGraphQL = "";
+
+      if (isVideo) {
+        const videoFile = await cariFileVideo(drive, judulSheet);
+        if (!videoFile) {
+          throw new Error(
+            `File video tidak ditemukan di SIAP UPLOAD: ${judulSheet}`
+          );
+        }
+        const videoUrl = getDriveDirectLink(videoFile);
+        assetsGraphQL = `{ video: { url: ${JSON.stringify(videoUrl)} } }`;
+      } else {
+        const fotoFiles = await cariFileFotoCarousel(drive, judulSheet);
+        if (fotoFiles.length === 0) {
+          throw new Error(
+            `Tidak ada foto carousel ditemukan untuk judul: ${judulSheet}`
+          );
+        }
+        assetsGraphQL = fotoFiles
+          .map((file) => {
+            const url = getDriveDirectLink(file);
+            return `{ image: { url: ${JSON.stringify(url)} } }`;
+          })
+          .join(",\n");
+      }
+
+      const result = await kirimEditPostKeBuffer(
+        postIdTT,
+        captionUntukTiktok,
+        assetsGraphQL,
+        dueAtIso
+      );
+      const editPostResult = result.data && result.data.editPost;
+
+      if (!editPostResult || editPostResult.message) {
+        throw new Error(
+          `Buffer menolak update: ${editPostResult ? editPostResult.message : JSON.stringify(result)}`
+        );
+      }
+
+      await updateCell(
+        sheets,
+        CONFIG.SPREADSHEET_ID,
+        CONFIG.SHEET_NAME,
+        nomorBaris,
+        idxCatatan,
+        `Diupdate di Buffer: ${new Date().toLocaleString("id-ID")}.`
+      );
+
+      diupdate++;
+      console.log(
+        `BERHASIL update baris ${nomorBaris}: ${postIdTT} -> ${dueAtIso}`
+      );
+    } catch (e) {
+      const catatanLama = row[idxCatatan] || "";
+      await updateCell(
+        sheets,
+        CONFIG.SPREADSHEET_ID,
+        CONFIG.SHEET_NAME,
+        nomorBaris,
+        idxCatatan,
+        `${catatanLama} | Gagal update Buffer: ${e.toString()}`
+      );
+      console.log(`GAGAL update TikTok baris ${nomorBaris}: ${e.toString()}`);
+    }
+  }
+
   console.log(
     diproses === 0
       ? "Tidak ada row yang siap diproses saat ini."
       : `Selesai proses TikTok (${diproses} row diproses).`
+  );
+  console.log(
+    `Update Buffer: ${diupdate} row di-update dari total row Scheduled yang diperiksa.`
   );
 }
 

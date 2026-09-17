@@ -37,6 +37,35 @@ async function kirimCreatePostKeBuffer(captionText, judulSheet, assetsGraphQL, d
   return response.json();
 }
 
+async function kirimEditPostKeBuffer(bufferPostId, captionText, assetsGraphQL, dueAtIso) {
+  const apiKey = getBufferApiKey();
+  const mutation = `
+    mutation {
+      editPost(
+        input: {
+          id: "${bufferPostId}"
+          text: ${JSON.stringify(captionText)}
+          dueAt: "${dueAtIso}"
+          assets: [ ${assetsGraphQL} ]
+        }
+      ) {
+        ... on PostActionSuccess {
+          post { id status dueAt }
+        }
+        ... on MutationError {
+          message
+        }
+      }
+    }
+  `;
+  const response = await fetch("https://api.buffer.com", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+    body: JSON.stringify({ query: mutation }),
+  });
+  return response.json();
+}
+
 async function cekStatusPost(bufferPostId) {
   const apiKey = getBufferApiKey();
   const query = `
@@ -56,4 +85,4 @@ async function cekStatusPost(bufferPostId) {
   return response.json();
 }
 
-module.exports = { kirimCreatePostKeBuffer, cekStatusPost };
+module.exports = { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost };

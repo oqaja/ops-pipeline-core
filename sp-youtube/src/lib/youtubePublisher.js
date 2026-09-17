@@ -71,9 +71,18 @@ async function updateVideoSchedule(youtube, videoId, jadwalUpload) {
 }
 
 async function getVideoStatus(youtube, videoId) {
-  const res = await youtube.videos.list({ part: ["status"], id: [videoId] });
+  const res = await youtube.videos.list({ part: ["snippet", "status"], id: [videoId] });
   const video = res.data.items && res.data.items[0];
-  return video ? video.status : null;
+  return video ? { status: video.status, snippet: video.snippet } : null;
+}
+
+/** YouTube API replace SELURUH snippet kalau part snippet diminta, jadi wajib pakai currentSnippet biar categoryId/tags/dll gak ke-reset. */
+async function updateVideoDetails(youtube, videoId, currentSnippet, { title, description }) {
+  const requestBody = {
+    id: videoId,
+    snippet: { ...currentSnippet, title, description },
+  };
+  await youtube.videos.update({ part: ["snippet"], requestBody });
 }
 
 module.exports = {
@@ -83,4 +92,5 @@ module.exports = {
   uploadVideo,
   updateVideoSchedule,
   getVideoStatus,
+  updateVideoDetails,
 };
