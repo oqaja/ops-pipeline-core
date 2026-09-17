@@ -4,7 +4,9 @@ on:
     types: [run-fp-main-automation, content-acc-ig-fp]
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    # offset 7 menit dari workflow lain yang juga */15 (sp/nsp ig, tiktok, yt main-upload)
+    # biar gak numpuk & kena drop GitHub pas periode load tinggi
+    - cron: '7,22,37,52 * * * *'
 concurrency:
   group: femmepolice-ig-main-automation
   cancel-in-progress: false
@@ -32,4 +34,3 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
           FEMMEPOLICE_IG_ACCESS_TOKEN: ${{ secrets.FEMMEPOLICE_IG_ACCESS_TOKEN }}
           GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
-# resync schedule Thu Sep 17 10:57:28 WIB 2026

@@ -47,7 +47,7 @@ function spTriggerGithubAutomation() {
       Accept: "application/vnd.github+json",
     },
     contentType: "application/json",
-    payload: JSON.stringify({ event_type: "run-main-automation" }),
+    payload: JSON.stringify({ event_type: "run-nsp-main-automation" }),
     muteHttpExceptions: true,
   };
 
