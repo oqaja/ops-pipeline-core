@@ -1,4 +1,4 @@
-name: Femmepolice IG - Backfill Post Insights (Self-Chaining)
+name: FP IG - Backfill Post Insights (Self-Chaining)
 # Trigger SEKALI lewat "Run workflow". Tiap batch nge-trigger batch berikutnya sendiri
 # sampai flag DONE di tab _State ke-set, lalu rantai berhenti total.
 # Reset: hapus baris "Instagram Femmepolice::BACKFILL_DONE" di tab _State.
@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   run:
-    name: Femmepolice IG - Backfill Post Insights
+    name: FP IG - Backfill Post Insights
     runs-on: ubuntu-latest
     defaults:
       run:

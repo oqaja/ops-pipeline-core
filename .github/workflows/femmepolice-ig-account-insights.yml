@@ -1,4 +1,4 @@
-name: Femmepolice IG - Account Insights
+name: FP IG - Account Insights
 on:
   schedule:
     - cron: '0 4,9 * * *'
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   run:
-    name: Femmepolice IG - Account Insights
+    name: FP IG - Account Insights
     runs-on: ubuntu-latest
     defaults:
       run:

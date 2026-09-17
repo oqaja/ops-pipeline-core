@@ -1,4 +1,4 @@
-name: Femmepolice IG - Main Automation
+name: FP IG - Main Automation
 on:
   repository_dispatch:
     types: [run-fp-main-automation, content-acc-ig-fp]
@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   run:
-    name: Femmepolice IG - Main Automation
+    name: FP IG - Main Automation
     runs-on: ubuntu-latest
     defaults:
       run:

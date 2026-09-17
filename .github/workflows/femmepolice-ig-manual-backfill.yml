@@ -1,4 +1,4 @@
-name: Femmepolice IG - Manual Backfill
+name: FP IG - Manual Backfill
 on:
   workflow_dispatch:
     inputs:
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   run:
-    name: Femmepolice IG - Manual Backfill
+    name: FP IG - Manual Backfill
     runs-on: ubuntu-latest
     defaults:
       run:

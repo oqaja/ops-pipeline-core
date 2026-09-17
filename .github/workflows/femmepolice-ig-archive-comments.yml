@@ -1,11 +1,11 @@
-name: Femmepolice IG - Archive Recent Comments
+name: FP IG - Archive Recent Comments
 on:
   schedule:
     - cron: '0 14 * * *'
   workflow_dispatch:
 jobs:
   run:
-    name: Femmepolice IG - Archive Recent Comments
+    name: FP IG - Archive Recent Comments
     runs-on: ubuntu-latest
     defaults:
       run:
