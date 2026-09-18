@@ -7,7 +7,7 @@ const {
   cariFileFotoCarousel,
   getDriveDirectLink,
 } = require("./driveFinder");
-const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer } = require("./bufferClient");
+const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost } = require("./bufferClient");
 
 async function jalankanUploadTiktok({ sheets, docs, drive }) {
   const data = await getRawGrid(
@@ -177,6 +177,7 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
   }
 
   let diupdate = 0;
+  let dinaikkanKeUploaded = 0;
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -201,6 +202,62 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
     if (!(jenisSesuai && statusScheduled && adaPostId)) continue;
 
     const nomorBaris = i + 1;
+
+    let statusCekBuffer;
+    try {
+      statusCekBuffer = await cekStatusPost(postIdTT);
+    } catch (e) {
+      console.log(
+        `WARNING: gagal cek status Buffer untuk baris ${nomorBaris}: ${e.toString()}`
+      );
+      statusCekBuffer = null;
+    }
+
+    const externalLink =
+      statusCekBuffer &&
+      statusCekBuffer.data &&
+      statusCekBuffer.data.post &&
+      statusCekBuffer.data.post.externalLink;
+
+    if (externalLink) {
+      const matchIdTiktok = externalLink.match(/\/video\/(\d+)/);
+      if (!matchIdTiktok) {
+        console.log(
+          `WARNING baris ${nomorBaris}: externalLink Buffer tidak sesuai pola TikTok, dilewati: ${externalLink}`
+        );
+      } else {
+        const idAsliTiktok = matchIdTiktok[1];
+
+        await updateCell(
+          sheets,
+          CONFIG.SPREADSHEET_ID,
+          CONFIG.SHEET_NAME,
+          nomorBaris,
+          idxPostIdTT,
+          idAsliTiktok
+        );
+        await updateCell(
+          sheets,
+          CONFIG.SPREADSHEET_ID,
+          CONFIG.SHEET_NAME,
+          nomorBaris,
+          idxStatusTT,
+          "Uploaded"
+        );
+        await updateCell(
+          sheets,
+          CONFIG.SPREADSHEET_ID,
+          CONFIG.SHEET_NAME,
+          nomorBaris,
+          idxCatatan,
+          `Video live di TikTok: ${externalLink}`
+        );
+
+        dinaikkanKeUploaded++;
+        console.log(`Baris ${nomorBaris} naik ke status Uploaded.`);
+        continue;
+      }
+    }
 
     const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
     if (!jadwalUpload) {
@@ -302,6 +359,9 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
   );
   console.log(
     `Update Buffer: ${diupdate} row di-update dari total row Scheduled yang diperiksa.`
+  );
+  console.log(
+    `Naik ke Uploaded: ${dinaikkanKeUploaded} row (video sudah live di TikTok).`
   );
 }
 
