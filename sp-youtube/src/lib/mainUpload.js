@@ -1,9 +1,9 @@
 const { CONFIG } = require("./config");
-const { getReadyRows, getUploadedRows } = require("./sheetReader");
+const { getReadyRows, getUploadedRows, getPendingManualUploadRows } = require("./sheetReader");
 const { cariFileVideo, downloadFileStream } = require("./driveFinder");
 const { cariKontenDiDocsMaster } = require("./docsReader");
 const { setCellValue, getHeaderColumnMap } = require("./sheetsHelper");
-const { combineDateAndTime } = require("./dateUtils");
+const { combineDateAndTime, toSheetDateString } = require("./dateUtils");
 const {
   buildTitle,
   buildDescription,
@@ -12,6 +12,8 @@ const {
   updateVideoSchedule,
   getVideoStatus,
   updateVideoDetails,
+  getUploadsPlaylistId,
+  findManualUploadByDate,
 } = require("./youtubePublisher");
 
 function sheetStatusFor(privacyStatus) {
@@ -106,33 +108,89 @@ async function processReschedule(row, headerMap, { sheets, docs, youtube }) {
       );
     }
 
-    const kontenDitemukan = await cariKontenDiDocsMaster(docs, judul);
-    const deskripsiUser = kontenDitemukan && kontenDitemukan.deskripsiYoutube ? kontenDitemukan.deskripsiYoutube.trim() : "";
-    const expectedTitle = buildTitle(judul, segmen);
-    const expectedDescription = buildDescription(deskripsiUser);
+    // Video "Video Panjang" di-upload manual via Studio, judul/deskripsi diatur editor sendiri
+    // (dan judulnya sengaja beda-beda karena A/B testing) - jangan disamain paksa dengan sheet/Docs.
+    const jenisKonten = String(row[CONFIG.JENIS_KONTEN_COLUMN] || "").trim().toLowerCase();
+    const isLandscape = jenisKonten === CONFIG.LANDSCAPE_JENIS_KONTEN.toLowerCase();
 
-    const needsDetailUpdate =
-      expectedTitle !== currentStatus.snippet.title || expectedDescription !== currentStatus.snippet.description;
+    if (!isLandscape) {
+      const kontenDitemukan = await cariKontenDiDocsMaster(docs, judul);
+      const deskripsiUser = kontenDitemukan && kontenDitemukan.deskripsiYoutube ? kontenDitemukan.deskripsiYoutube.trim() : "";
+      const expectedTitle = buildTitle(judul, segmen);
+      const expectedDescription = buildDescription(deskripsiUser);
 
-    if (needsDetailUpdate) {
-      console.log(`  Update title/description baris ${nomorBaris} (${videoId}) karena berubah di sheet/Docs.`);
-      await updateVideoDetails(youtube, videoId, currentStatus.snippet, {
-        title: expectedTitle,
-        description: expectedDescription,
-      });
+      const needsDetailUpdate =
+        expectedTitle !== currentStatus.snippet.title || expectedDescription !== currentStatus.snippet.description;
+
+      if (needsDetailUpdate) {
+        console.log(`  Update title/description baris ${nomorBaris} (${videoId}) karena berubah di sheet/Docs.`);
+        await updateVideoDetails(youtube, videoId, currentStatus.snippet, {
+          title: expectedTitle,
+          description: expectedDescription,
+        });
+        await setCellValue(
+          sheets,
+          CONFIG.KALENDER_SPREADSHEET_ID,
+          CONFIG.SHEET_NAME,
+          nomorBaris,
+          headerMap[CONFIG.CATATAN_COLUMN],
+          `Update title/description karena berubah di sheet/Docs.`
+        );
+      }
+    }
+
+    await setCellValue(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, headerMap[CONFIG.STATUS_COLUMN], expectedSheetStatus);
+  } catch (e) {
+    console.log(`  (info) Gagal cek/reschedule baris ${nomorBaris} (${videoId}): ${e.message}`);
+  }
+}
+
+/** "TANGGAL" baris jadi "YYYY-MM-DD" di CONFIG.TIMEZONE, buat dicocokkan dengan tanggal upload YouTube. */
+function tanggalOnlyString(tanggalCell) {
+  const tengahMalam = combineDateAndTime(tanggalCell, "00:00", CONFIG.TIMEZONE);
+  if (!tengahMalam) return null;
+  return toSheetDateString(tengahMalam, CONFIG.TIMEZONE).slice(0, 10);
+}
+
+async function processManualUploadMatch(row, headerMap, uploadsPlaylistId, { sheets, youtube }) {
+  const nomorBaris = row._rowNumber;
+  const targetDateStr = tanggalOnlyString(row[CONFIG.TANGGAL_COLUMN]);
+
+  if (!targetDateStr) {
+    console.log(`  Baris ${nomorBaris}: TANGGAL (${row[CONFIG.TANGGAL_COLUMN]}) tidak valid, skip matching.`);
+    return;
+  }
+
+  try {
+    const candidates = await findManualUploadByDate(youtube, uploadsPlaylistId, targetDateStr, CONFIG.TIMEZONE);
+
+    if (candidates.length === 1) {
+      const videoId = candidates[0].videoId;
+      await setCellValue(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, headerMap[CONFIG.POST_ID_COLUMN], videoId);
       await setCellValue(
         sheets,
         CONFIG.KALENDER_SPREADSHEET_ID,
         CONFIG.SHEET_NAME,
         nomorBaris,
         headerMap[CONFIG.CATATAN_COLUMN],
-        `Update title/description karena berubah di sheet/Docs.`
+        `Video landscape ketemu & di-link otomatis: ${videoId}`
       );
+      console.log(`  Baris ${nomorBaris}: matched ke video ${videoId}`);
+    } else if (candidates.length === 0) {
+      console.log(`  Baris ${nomorBaris}: belum ketemu upload manual untuk tanggal ${targetDateStr}, coba lagi run berikutnya.`);
+    } else {
+      await setCellValue(
+        sheets,
+        CONFIG.KALENDER_SPREADSHEET_ID,
+        CONFIG.SHEET_NAME,
+        nomorBaris,
+        headerMap[CONFIG.CATATAN_COLUMN],
+        `WARNING: ketemu ${candidates.length} video di tanggal yang sama, gak bisa matching otomatis - isi POST ID YT manual.`
+      );
+      console.log(`  Baris ${nomorBaris}: AMBIGU, ${candidates.length} kandidat ditemukan, di-skip.`);
     }
-
-    await setCellValue(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, headerMap[CONFIG.STATUS_COLUMN], expectedSheetStatus);
   } catch (e) {
-    console.log(`  (info) Gagal cek/reschedule baris ${nomorBaris} (${videoId}): ${e.message}`);
+    console.log(`  Baris ${nomorBaris}: gagal matching - ${e.message}`);
   }
 }
 
@@ -143,6 +201,15 @@ async function runMainUpload({ sheets, docs, drive, youtube }) {
   console.log(`${readyRows.length} row siap di-upload.`);
   for (const row of readyRows) {
     await processNewUpload(row, headerMap, { sheets, docs, drive, youtube });
+  }
+
+  const pendingManual = await getPendingManualUploadRows(sheets);
+  if (pendingManual.length > 0) {
+    console.log(`${pendingManual.length} row landscape nunggu manual upload - coba matching...`);
+    const uploadsPlaylistId = await getUploadsPlaylistId(youtube);
+    for (const row of pendingManual) {
+      await processManualUploadMatch(row, headerMap, uploadsPlaylistId, { sheets, youtube });
+    }
   }
 
   const uploadedRows = await getUploadedRows(sheets);

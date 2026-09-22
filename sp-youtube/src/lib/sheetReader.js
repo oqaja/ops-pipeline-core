@@ -30,4 +30,29 @@ async function getUploadedRows(sheets) {
   return rows.filter((row) => String(row[CONFIG.POST_ID_COLUMN] || "").trim() !== "");
 }
 
-module.exports = { getReadyRows, getUploadedRows, isReadyToPost };
+/** Baris "Video Panjang" yang udah di-Acc tapi belum ke-link ke video YouTube (upload manual di Studio, nunggu di-matching). */
+function isPendingManualUpload(row) {
+  const jenisKonten = String(row[CONFIG.JENIS_KONTEN_COLUMN] || "").trim().toLowerCase();
+  if (jenisKonten !== CONFIG.LANDSCAPE_JENIS_KONTEN.toLowerCase()) return false;
+
+  const statusYt = String(row[CONFIG.STATUS_COLUMN] || "").trim().toUpperCase();
+  if (statusYt !== CONFIG.READY_STATUS_VALUE.toUpperCase()) return false;
+
+  const postId = String(row[CONFIG.POST_ID_COLUMN] || "").trim();
+  if (postId !== "") return false;
+
+  return true;
+}
+
+async function getPendingManualUploadRows(sheets) {
+  const { rows } = await readSheetAsObjects(sheets, CONFIG.KALENDER_SPREADSHEET_ID, CONFIG.SHEET_NAME);
+  return rows.filter(isPendingManualUpload);
+}
+
+module.exports = {
+  getReadyRows,
+  getUploadedRows,
+  isReadyToPost,
+  getPendingManualUploadRows,
+  isPendingManualUpload,
+};
