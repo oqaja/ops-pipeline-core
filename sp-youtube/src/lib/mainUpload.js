@@ -212,8 +212,10 @@ async function runMainUpload({ sheets, docs, drive, youtube }) {
     }
   }
 
-  const uploadedRows = await getUploadedRows(sheets);
-  console.log(`${uploadedRows.length} row sudah pernah upload - cek apakah ada reschedule.`);
+  const { rows: uploadedRows, totalWithPostId } = await getUploadedRows(sheets);
+  console.log(
+    `${totalWithPostId} row punya POST ID, ${uploadedRows.length} row lolos filter window (RESCHEDULE_CHECK_DAYS=${CONFIG.RESCHEDULE_CHECK_DAYS}) - cek apakah ada reschedule.`
+  );
   for (const row of uploadedRows) {
     await processReschedule(row, headerMap, { sheets, docs, youtube });
   }
