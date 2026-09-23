@@ -42,7 +42,7 @@ const CONFIG = {
   COMMENTS_SHEET_NAME: "Youtube Sp Comments",
   STATE_SHEET_NAME: "_State",
 
-  RESCHEDULE_CHECK_DAYS: 7, // processReschedule cuma cek baris yang TANGGAL-nya masih dalam window ini (+ semua baris masa depan)
+  RESCHEDULE_CHECK_DAYS: 2, // processReschedule cuma cek baris yang TANGGAL-nya masih dalam window ini (+ semua baris masa depan)
 
   MAX_INSIGHTS_BATCH: 50, // video per run buat refresh insight terbaru
   BACKFILL_MAX_PAGES_PER_RUN: 2, // 2 x 50 = 100 video per batch backfill (aman dari rate limit Sheets)
