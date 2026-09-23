@@ -9,6 +9,43 @@ const {
 } = require("./driveFinder");
 const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost } = require("./bufferClient");
 
+// Kalau response GraphQL Buffer berisi error NOT_FOUND, anggap post sudah publish
+// (record Buffer di-purge) dan naikkan row ke Uploaded. Return true kalau row ditangani.
+async function tanganiBufferNotFound(
+  result,
+  { sheets, nomorBaris, idxStatusTT, idxCatatan }
+) {
+  const isNotFoundError =
+    result &&
+    result.errors &&
+    result.errors.some(
+      (e) => e.extensions && e.extensions.code === "NOT_FOUND"
+    );
+
+  if (!isNotFoundError) return false;
+
+  await updateCell(
+    sheets,
+    CONFIG.SPREADSHEET_ID,
+    CONFIG.SHEET_NAME,
+    nomorBaris,
+    idxStatusTT,
+    "Uploaded"
+  );
+  await updateCell(
+    sheets,
+    CONFIG.SPREADSHEET_ID,
+    CONFIG.SHEET_NAME,
+    nomorBaris,
+    idxCatatan,
+    "Video kemungkinan sudah live (record Buffer sudah tidak ditemukan/purged setelah publish) - POST ID TT masih ID Buffer lama, BUKAN ID TikTok asli. Cek manual di TikTok kalau perlu ID pastinya."
+  );
+  console.log(
+    `  Baris ${nomorBaris}: Buffer record NOT_FOUND (kemungkinan sudah publish), dinaikkan ke Uploaded (ID Buffer lama dipertahankan, bukan ID TikTok asli).`
+  );
+  return true;
+}
+
 async function jalankanUploadTiktok({ sheets, docs, drive }) {
   const data = await getRawGrid(
     sheets,
@@ -213,6 +250,18 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
       statusCekBuffer = null;
     }
 
+    if (
+      await tanganiBufferNotFound(statusCekBuffer, {
+        sheets,
+        nomorBaris,
+        idxStatusTT,
+        idxCatatan,
+      })
+    ) {
+      dinaikkanKeUploaded++;
+      continue;
+    }
+
     const externalLink =
       statusCekBuffer &&
       statusCekBuffer.data &&
@@ -317,6 +366,19 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
         assetsGraphQL,
         dueAtIso
       );
+
+      if (
+        await tanganiBufferNotFound(result, {
+          sheets,
+          nomorBaris,
+          idxStatusTT,
+          idxCatatan,
+        })
+      ) {
+        dinaikkanKeUploaded++;
+        continue;
+      }
+
       const editPostResult = result.data && result.data.editPost;
 
       if (!editPostResult || editPostResult.message) {
