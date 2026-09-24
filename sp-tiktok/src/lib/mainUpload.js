@@ -8,6 +8,7 @@ const {
   getDriveDirectLink,
 } = require("./driveFinder");
 const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost } = require("./bufferClient");
+const { bacaGridInsightTiktok, cariVideoIdByWaktu } = require("./tiktokInsightMatcher");
 
 // Kalau response GraphQL Buffer berisi error NOT_FOUND, anggap post sudah publish
 // (record Buffer di-purge) dan naikkan row ke Uploaded. Return true kalau row ditangani.
@@ -216,6 +217,17 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
   let diupdate = 0;
   let dinaikkanKeUploaded = 0;
 
+  // Baca sheet insight TikTok SEKALI untuk semua baris. Kalau gagal, grid kosong ->
+  // matching by waktu dilewati dan semua baris fallback ke cekStatusPost.
+  let gridInsightTiktok = [];
+  try {
+    gridInsightTiktok = await bacaGridInsightTiktok(sheets);
+  } catch (e) {
+    console.log(
+      `WARNING: gagal baca sheet insight TikTok, matching by waktu dilewati untuk run ini: ${e.toString()}`
+    );
+  }
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const judulSheet = row[idxJudul];
@@ -239,6 +251,44 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
     if (!(jenisSesuai && statusScheduled && adaPostId)) continue;
 
     const nomorBaris = i + 1;
+
+    const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
+    if (!jadwalUpload) {
+      console.log(
+        `WARNING: Baris ${nomorBaris} dilewati (update): TANGGAL/JAM UP TT tidak valid.`
+      );
+      continue;
+    }
+
+    // Lapis 1: cocokkan jadwal ke "Tanggal Upload" di sheet insight TikTok (data langsung
+    // dari API TikTok). Kalau gagal/0/ambigu, lanjut ke pengecekan Buffer di bawah.
+    let kandidatByWaktu = [];
+    try {
+      kandidatByWaktu = cariVideoIdByWaktu(gridInsightTiktok, jadwalUpload, 7); // toleransi 7 menit (tengah dari rentang 5-10 yang diminta)
+    } catch (e) {
+      console.log(
+        `WARNING: gagal matching by waktu untuk baris ${nomorBaris}: ${e.toString()}`
+      );
+    }
+
+    if (kandidatByWaktu.length === 1) {
+      const idAsliTiktok = kandidatByWaktu[0].videoId;
+      await updateCell(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, idxPostIdTT, idAsliTiktok);
+      await updateCell(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, idxStatusTT, "Uploaded");
+      await updateCell(
+        sheets,
+        CONFIG.SPREADSHEET_ID,
+        CONFIG.SHEET_NAME,
+        nomorBaris,
+        idxCatatan,
+        `Video live di TikTok (matched by waktu dari sheet insight): ${idAsliTiktok}`
+      );
+      dinaikkanKeUploaded++;
+      console.log(`  Baris ${nomorBaris}: matched by waktu ke video ${idAsliTiktok}, naik ke Uploaded.`);
+      continue;
+    } else if (kandidatByWaktu.length > 1) {
+      console.log(`  Baris ${nomorBaris}: AMBIGU by waktu, ${kandidatByWaktu.length} kandidat ditemukan dalam toleransi, lanjut coba cara lain.`);
+    }
 
     let statusCekBuffer;
     try {
@@ -306,14 +356,6 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
         console.log(`Baris ${nomorBaris} naik ke status Uploaded.`);
         continue;
       }
-    }
-
-    const jadwalUpload = gabungkanTanggalJam(tanggalCell, jamUpTT);
-    if (!jadwalUpload) {
-      console.log(
-        `Baris ${nomorBaris} dilewati (update): TANGGAL/JAM UP TT tidak valid.`
-      );
-      continue;
     }
 
     console.log(

@@ -61,3 +61,25 @@ function toSheetDateString(date) {
 }
 
 module.exports.toSheetDateString = toSheetDateString;
+
+module.exports.BULAN_ID = BULAN_ID;
+
+/**
+ * Parse format "DD Mon YYYY HH:mm" (contoh: "23 Sep 2026 14:30") - dipakai sheet insight TikTok.
+ * Jam di sheet insight adalah WIB (ditulis via toSheetDateString), jadi dikonversi ke UTC
+ * dengan cara yang sama seperti gabungkanTanggalJam (jam - 7), tidak bergantung TZ mesin.
+ */
+function parseTanggalInsightTikTok(value) {
+  const match = String(value).trim().match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\s+(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const day = parseInt(match[1], 10);
+  const monthKey = match[2].toLowerCase().substring(0, 3);
+  const month = BULAN_ID[monthKey];
+  const year = parseInt(match[3], 10);
+  const jam = parseInt(match[4], 10);
+  const menit = parseInt(match[5], 10);
+  if (month === undefined || isNaN(day) || isNaN(year) || isNaN(jam) || isNaN(menit)) return null;
+  return new Date(Date.UTC(year, month, day, jam - 7, menit, 0));
+}
+
+module.exports.parseTanggalInsightTikTok = parseTanggalInsightTikTok;
