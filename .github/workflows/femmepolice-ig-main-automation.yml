@@ -3,10 +3,6 @@ on:
   repository_dispatch:
     types: [run-fp-main-automation, content-acc-ig-fp]
   workflow_dispatch:
-  schedule:
-    # offset 7 menit dari workflow lain yang juga */15 (sp/nsp ig, tiktok, yt main-upload)
-    # biar gak numpuk & kena drop GitHub pas periode load tinggi
-    - cron: '7,22,37,52 * * * *'
 concurrency:
   group: femmepolice-ig-main-automation
   cancel-in-progress: false

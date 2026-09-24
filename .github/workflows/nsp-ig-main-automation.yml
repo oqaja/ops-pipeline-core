@@ -3,8 +3,6 @@ on:
   repository_dispatch:
     types: [run-nsp-main-automation, content-acc-ig-nsp]
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 concurrency:
   group: nsp-ig-main-automation
   cancel-in-progress: false
