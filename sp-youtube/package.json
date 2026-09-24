@@ -4,7 +4,9 @@
   "private": true,
   "description": "YouTube upload + insights + comments — GitHub Actions, Service Account for Sheets/Docs/Drive + OAuth for YouTube.",
   "type": "commonjs",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "main-upload": "node scripts/run-main-upload.js",
     "post-insights": "node scripts/run-post-insights.js",
@@ -14,6 +16,7 @@
     "regen-token": "node scripts/regen-refresh-token.js"
   },
   "dependencies": {
+    "dotenv": "^18.0.3",
     "googleapis": "^140.0.1",
     "libsodium-wrappers": "^0.8.4"
   }
