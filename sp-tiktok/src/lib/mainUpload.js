@@ -7,6 +7,7 @@ const {
   cariFileFotoCarousel,
   getDriveDirectLink,
 } = require("./driveFinder");
+const { siapkanGambarUntukTiktok, hapusFileSementara } = require("./imageResize");
 const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost } = require("./bufferClient");
 const { bacaGridInsightTiktok, cariVideoIdByWaktu } = require("./tiktokInsightMatcher");
 
@@ -105,6 +106,7 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
     );
     diproses++;
 
+    let tempFileIds = [];
     try {
       const kontenDitemukan = await cariKontenDiDocsMaster(docs, judulSheet);
       const captionUntukTiktok =
@@ -137,11 +139,14 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
             `Tidak ada foto carousel ditemukan untuk judul: ${judulSheet}`
           );
         }
-        assetsGraphQL = fotoFiles
-          .map((file) => {
-            const url = getDriveDirectLink(file);
-            return `{ image: { url: ${JSON.stringify(url)} } }`;
-          })
+        // Resize otomatis kalau ada foto yang kelebihan batas pixel count TikTok
+        // Photo Mode (2.073.600 px / setara 1920x1080) - lihat imageResize.js.
+        const hasilGambar = await Promise.all(
+          fotoFiles.map((file) => siapkanGambarUntukTiktok(drive, file))
+        );
+        tempFileIds = hasilGambar.map((h) => h.tempFileId).filter(Boolean);
+        assetsGraphQL = hasilGambar
+          .map((h) => `{ image: { url: ${JSON.stringify(h.url)} } }`)
           .join(",\n");
         console.log(
           `Carousel baris ${nomorBaris}: ${fotoFiles.length} foto ditemukan.`
@@ -211,6 +216,10 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
         `Error TikTok (Buffer): ${e.toString()}`
       );
       console.log(`GAGAL TikTok baris ${nomorBaris}: ${e.toString()}`);
+    } finally {
+      for (const tempFileId of tempFileIds) {
+        await hapusFileSementara(drive, tempFileId);
+      }
     }
   }
 
@@ -362,6 +371,7 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
       `Proses update TikTok baris ${nomorBaris} [${isVideo ? "video" : "carousel"}]: ${judulSheet}`
     );
 
+    let tempFileIdsUpdate = [];
     try {
       const kontenDitemukan = await cariKontenDiDocsMaster(docs, judulSheet);
       const captionUntukTiktok =
@@ -394,11 +404,12 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
             `Tidak ada foto carousel ditemukan untuk judul: ${judulSheet}`
           );
         }
-        assetsGraphQL = fotoFiles
-          .map((file) => {
-            const url = getDriveDirectLink(file);
-            return `{ image: { url: ${JSON.stringify(url)} } }`;
-          })
+        const hasilGambar = await Promise.all(
+          fotoFiles.map((file) => siapkanGambarUntukTiktok(drive, file))
+        );
+        tempFileIdsUpdate = hasilGambar.map((h) => h.tempFileId).filter(Boolean);
+        assetsGraphQL = hasilGambar
+          .map((h) => `{ image: { url: ${JSON.stringify(h.url)} } }`)
           .join(",\n");
       }
 
@@ -453,6 +464,10 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
         `${catatanLama} | Gagal update Buffer: ${e.toString()}`
       );
       console.log(`GAGAL update TikTok baris ${nomorBaris}: ${e.toString()}`);
+    } finally {
+      for (const tempFileId of tempFileIdsUpdate) {
+        await hapusFileSementara(drive, tempFileId);
+      }
     }
   }
 

@@ -15,7 +15,9 @@ async function getAuthClients() {
     scopes: [
       "https://www.googleapis.com/auth/spreadsheets",
       "https://www.googleapis.com/auth/documents.readonly",
-      "https://www.googleapis.com/auth/drive.readonly",
+      // Full akses (bukan readonly) - dibutuhkan buat upload + hapus file hasil
+      // resize sementara di imageResize.js (fix pixel-count TikTok Photo Mode).
+      "https://www.googleapis.com/auth/drive",
     ],
   });
   const client = await auth.getClient();
