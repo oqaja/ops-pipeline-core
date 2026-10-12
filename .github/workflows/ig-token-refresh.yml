@@ -1,0 +1,61 @@
+name: IG - Refresh Access Tokens
+# Perpanjang token Instagram Login (60 hari) milik SP, NSP, dan Femmepolice sebelum expire,
+# lalu simpan token baru ke secret repo. Jalan tiap tanggal 1 dan 15 (jam 02:00 UTC).
+# Butuh secret GH_SECRETS_PAT: fine-grained PAT dengan izin Repository > Secrets: Read and write.
+# (GITHUB_TOKEN bawaan tidak boleh menulis secret.)
+on:
+  schedule:
+    - cron: '0 2 1,15 * *'
+  workflow_dispatch:
+concurrency:
+  group: ig-token-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
+      GH_REPO: ${{ github.repository }}
+      SP_IG_ACCESS_TOKEN: ${{ secrets.SP_IG_ACCESS_TOKEN }}
+      NSP_IG_ACCESS_TOKEN: ${{ secrets.NSP_IG_ACCESS_TOKEN }}
+      FEMMEPOLICE_IG_ACCESS_TOKEN: ${{ secrets.FEMMEPOLICE_IG_ACCESS_TOKEN }}
+    steps:
+      - name: Refresh token tiap akun
+        shell: bash
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret GH_SECRETS_PAT belum di-set."
+            exit 1
+          fi
+
+          failed=0
+          for name in SP_IG_ACCESS_TOKEN NSP_IG_ACCESS_TOKEN FEMMEPOLICE_IG_ACCESS_TOKEN; do
+            current="${!name}"
+            if [ -z "$current" ]; then
+              echo "::warning::$name kosong, dilewati."
+              continue
+            fi
+
+            resp=$(curl -sS --get "https://graph.instagram.com/refresh_access_token" \
+              --data-urlencode "grant_type=ig_refresh_token" \
+              --data-urlencode "access_token=$current")
+
+            new=$(echo "$resp" | jq -r '.access_token // empty')
+            if [ -z "$new" ]; then
+              msg=$(echo "$resp" | jq -r '.error.message // "respons tidak dikenal"')
+              echo "::error::$name gagal di-refresh: $msg"
+              failed=1
+              continue
+            fi
+
+            echo "::add-mask::$new"
+            expires=$(echo "$resp" | jq -r '.expires_in // 0')
+            if gh secret set "$name" --body "$new"; then
+              echo "$name: OK, berlaku ~$((expires / 86400)) hari lagi."
+            else
+              echo "::error::$name: token baru didapat tapi gagal disimpan ke secret."
+              failed=1
+            fi
+          done
+
+          exit $failed
