@@ -32,7 +32,8 @@ jobs:
           for name in SP_IG_ACCESS_TOKEN NSP_IG_ACCESS_TOKEN FEMMEPOLICE_IG_ACCESS_TOKEN; do
             current="${!name}"
             if [ -z "$current" ]; then
-              echo "::warning::$name kosong, dilewati."
+              echo "::error::$name kosong / belum di-set."
+              failed=1
               continue
             fi
 
