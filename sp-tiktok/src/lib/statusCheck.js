@@ -1,6 +1,7 @@
 const { CONFIG } = require("./config");
 const { getRawGrid, cariIndexKolom, updateCell } = require("./sheetRaw");
 const { cekStatusPost } = require("./bufferClient");
+const { ekstrakIdTiktok } = require("./tiktokLink");
 
 async function cekStatusUploadTiktok({ sheets }) {
   const data = await getRawGrid(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME);
@@ -33,6 +34,14 @@ async function cekStatusUploadTiktok({ sheets }) {
       }
 
       if (post.status === "sent") {
+        // Ganti ID Buffer di POST ID TT dengan ID TikTok asli (kalau link-nya bisa dibaca),
+        // supaya konsisten dengan jalur main-upload dan insight bisa nyambung ke baris ini.
+        const idAsliTiktok = ekstrakIdTiktok(post.externalLink);
+        if (idAsliTiktok) {
+          await updateCell(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, idxPostIdTT, idAsliTiktok);
+        } else {
+          console.log(`WARNING baris ${nomorBaris}: externalLink tidak sesuai pola TikTok, POST ID TT tetap ID Buffer: ${post.externalLink}`);
+        }
         await updateCell(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, idxStatusTT, "Uploaded");
         await updateCell(sheets, CONFIG.SPREADSHEET_ID, CONFIG.SHEET_NAME, nomorBaris, idxCatatan, `Published: ${post.externalLink}`);
         console.log(`BERHASIL publish baris ${nomorBaris}: ${post.externalLink}`);

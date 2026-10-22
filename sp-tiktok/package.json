@@ -12,7 +12,8 @@
     "status-check": "node scripts/run-status-check.js",
     "post-insights": "node scripts/run-post-insights.js",
     "backfill-post-insights": "node scripts/run-backfill-post-insights.js",
-    "account-snapshot": "node scripts/run-account-snapshot.js"
+    "account-snapshot": "node scripts/run-account-snapshot.js",
+    "backfill-post-id-tt": "node scripts/run-backfill-post-id-tt.js"
   },
   "dependencies": {
     "googleapis": "^140.0.1",
