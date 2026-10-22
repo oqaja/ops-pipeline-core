@@ -9,6 +9,7 @@ const {
 } = require("./driveFinder");
 const { kirimCreatePostKeBuffer, kirimEditPostKeBuffer, cekStatusPost } = require("./bufferClient");
 const { bacaGridInsightTiktok, cariVideoIdByWaktu } = require("./tiktokInsightMatcher");
+const { ekstrakIdTiktok } = require("./tiktokLink");
 
 // Kalau response GraphQL Buffer berisi error NOT_FOUND, anggap post sudah publish
 // (record Buffer di-purge) dan naikkan row ke Uploaded. Return true kalau row ditangani.
@@ -319,13 +320,13 @@ async function jalankanUploadTiktok({ sheets, docs, drive }) {
       statusCekBuffer.data.post.externalLink;
 
     if (externalLink) {
-      const matchIdTiktok = externalLink.match(/\/video\/(\d+)/);
-      if (!matchIdTiktok) {
+      const idDariLink = ekstrakIdTiktok(externalLink); // video (/video/) dan carousel (/photo/)
+      if (!idDariLink) {
         console.log(
           `WARNING baris ${nomorBaris}: externalLink Buffer tidak sesuai pola TikTok, dilewati: ${externalLink}`
         );
       } else {
-        const idAsliTiktok = matchIdTiktok[1];
+        const idAsliTiktok = idDariLink;
 
         await updateCell(
           sheets,
