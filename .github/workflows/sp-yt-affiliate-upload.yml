@@ -1,0 +1,43 @@
+name: SP YouTube - Affiliate Upload
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: sp-yt-affiliate-upload
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: sp-youtube
+    permissions:
+      contents: read
+    env:
+      KALENDER_SPREADSHEET_ID: ${{ vars.KALENDER_SPREADSHEET_ID }}
+      INSIGHTS_SPREADSHEET_ID: ${{ vars.INSIGHTS_SPREADSHEET_ID }}
+      DRIVE_FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
+      DOCS_MASTER_ID: ${{ vars.DOCS_MASTER_ID }}
+      CHANNEL_DESCRIPTION_TEMPLATE: ${{ vars.CHANNEL_DESCRIPTION_TEMPLATE }}
+      AFFILIATE_SPREADSHEET_ID: ${{ vars.AFFILIATE_SPREADSHEET_ID }}
+      AFFILIATE_SHEET_NAME: ${{ vars.AFFILIATE_SHEET_NAME }}
+      AFFILIATE_MAX_UPLOADS_PER_RUN: ${{ vars.AFFILIATE_MAX_UPLOADS_PER_RUN }}
+      AFFILIATE_MAX_UPLOADS_PER_DAY: ${{ vars.AFFILIATE_MAX_UPLOADS_PER_DAY }}
+      AFFILIATE_AHEAD_DAYS: ${{ vars.AFFILIATE_AHEAD_DAYS }}
+      AFFILIATE_AKUN: SP
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run affiliate-upload
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.SP_YT_REFRESH_TOKEN }}
+          SECRETS_WRITE_PAT: ${{ secrets.SECRETS_WRITE_PAT }}
