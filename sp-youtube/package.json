@@ -9,6 +9,7 @@
   },
   "scripts": {
     "main-upload": "node scripts/run-main-upload.js",
+    "affiliate-upload": "node scripts/run-affiliate-upload.js",
     "post-insights": "node scripts/run-post-insights.js",
     "backfill-post-insights": "node scripts/run-backfill-post-insights.js",
     "account-snapshot": "node scripts/run-account-snapshot.js",
