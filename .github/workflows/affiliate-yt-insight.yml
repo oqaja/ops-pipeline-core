@@ -1,0 +1,45 @@
+name: Affiliate YouTube - Insight (SP, DFM, FAP, MT)
+on:
+  schedule:
+    - cron: '7 23,11 * * *'   # 06.07 & 18.07 WIB
+  workflow_dispatch:
+concurrency:
+  group: affiliate-yt-insight
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        akun: [SP, DFM, FAP, MT]
+    defaults:
+      run:
+        working-directory: sp-youtube
+    permissions:
+      contents: read
+    env:
+      KALENDER_SPREADSHEET_ID: ${{ vars.KALENDER_SPREADSHEET_ID }}
+      INSIGHTS_SPREADSHEET_ID: ${{ vars.INSIGHTS_SPREADSHEET_ID }}
+      DRIVE_FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
+      DOCS_MASTER_ID: ${{ vars.DOCS_MASTER_ID }}
+      CHANNEL_DESCRIPTION_TEMPLATE: ${{ vars.CHANNEL_DESCRIPTION_TEMPLATE }}
+      AFFILIATE_SPREADSHEET_ID: ${{ vars.AFFILIATE_SPREADSHEET_ID }}
+      AFFILIATE_SHEET_NAME: ${{ vars.AFFILIATE_SHEET_NAME }}
+      AFFILIATE_AKUN: ${{ matrix.akun }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run affiliate-insight
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.SP_IG_GOOGLE_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.SP_IG_GOOGLE_DRIVE_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets[format('{0}_YT_REFRESH_TOKEN', matrix.akun)] }}
+          SECRETS_WRITE_PAT: ${{ secrets.SECRETS_WRITE_PAT }}
