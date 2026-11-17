@@ -1,5 +1,7 @@
 name: SP YouTube - Affiliate Upload
 on:
+  repository_dispatch:
+    types: [run-main-automation]
   schedule:
     - cron: '*/20 * * * *'
   workflow_dispatch:
